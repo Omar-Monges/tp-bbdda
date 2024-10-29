@@ -132,14 +132,19 @@ AS BEGIN
 	ELSE --Si entra en el else el domicilio es un edificio!
 	BEGIN
 		IF EXISTS (SELECT 1 FROM Direccion.Direccion 
-				WHERE  Localidad LIKE @Localidad AND CodPostal = @CodPostal AND Calle = @Calle AND Numero LIKE @NumCalle)
+				WHERE  Localidad <> @Localidad OR CodPostal = @CodPostal OR Calle = @Calle OR Numero <> @NumCalle OR
+						Piso <> @Piso OR Departamento <> @Departamento)--Si piso o departamento son diferentes es una nueva direccion!
+		BEGIN--NO existe la direccion
+				INSERT INTO Direccion.Direccion(Calle,Numero,CodPostal,Localidad,Piso,Departamento) VALUES
+					(@Calle,@NumCalle,@CodPostal,@Localidad,@Piso,@Departamento)
+		END
 	END
 
 	SET @IDDireccion = (SELECT DISTINCT IDDireccion FROM Direccion.Direccion 
 						WHERE Numero = @NumCalle AND Calle LIKE @Calle AND CodPostal = @CodPostal AND Localidad LIKE @Localidad);
 
 	INSERT INTO Empleado.Empleado(DNI,Nombre,Apellido,IDDireccion,EmailPersonal,EmailEmpresa,IDSucursal,IDTurno,IDCargo,CUIL) 
-	VALUES(@DNI,@Nombre,@Apellido,@IDDireccion,@EmailPersonal,@EmailEmpresa,@IDSucursal,@IDTurno,@IDCargo,Empleado.calcularCuil(@DNI,@Sexo));
+	VALUES(@DNI,@Nombre,@Apellido,@IDDireccion,@EmailPersonal,@EmailEmpresa,@IDSucursal,@IDTurno,@IDCargo,Empleado.calcularCuil(@DNI,@Sexo))
 END;
 GO
 ---Modificar Empleado
