@@ -31,9 +31,9 @@
 		verSucursales
 		verEmpleadosDeSucursales
 	Tabla Cargo
-		agregarCargo
-		modificarCargo
-		eliminarCargo
+		agregarCargo X
+		modificarCargo X 
+		eliminarCargo X
 
 		verCargosDeEmpleados
 	Tabla Turno
@@ -129,7 +129,7 @@ AS BEGIN
 	DECLARE @idDireccion INT;
 	DECLARE @cuil VARCHAR(13);
 
-	IF (@dni NOT LIKE '[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]')
+	IF (@dni IS NULL OR @dni NOT LIKE '[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]')
 	BEGIN
 		RAISERROR('Error en el procedimiento almacenado agregarEmpleado. El DNI es inválido.',16,1);
 		RETURN;
@@ -153,13 +153,13 @@ AS BEGIN
 		RETURN;
 	END
 
-	IF (@emailPersonal NOT LIKE '%@%.com')
+	IF (@emailPersonal IS NULL OR @emailPersonal NOT LIKE '%@%.com')
 	BEGIN
 		RAISERROR('Error en el procedimiento almacenado agregarEmpleado. El Email Personal es inválido.',16,1);
 		RETURN;
 	END;
 
-	IF (@emailEmpresa NOT LIKE '%@aurora.com')
+	IF (@emailEmpresa IS NULL OR @emailEmpresa NOT LIKE '%@aurora.com')
 	BEGIN
 		RAISERROR('Error en el procedimiento almacenado agregarEmpleado. El Email Empresarial tiene un formato inválido.',16,1);
 		RETURN;
@@ -171,32 +171,32 @@ AS BEGIN
 		RETURN;
 	END;
 
-	IF (@idTurno NOT IN (SELECT idTurno FROM Sucursal.Turno))
+	IF NOT EXISTS (SELECT 1 FROM Sucursal.Turno WHERE idTurno = @idTurno)
 	BEGIN
 		RAISERROR('Error en el procedimiento almacenado agregarEmpleado. El ID del turno no existe.',16,1);
 		RETURN;
 	END;
 
-	IF (@idCargo NOT IN (SELECT idCargo FROM Sucursal.Cargo))
+	IF NOT EXISTS (SELECT 1 FROM Sucursal.Cargo WHERE idCargo = @idCargo)
 	BEGIN
 		RAISERROR('Error en el procedimiento almacenado agregarEmpleado. El ID del cargo no existe.',16,1);
 		RETURN;
 	END;
 	
-	IF ((@piso IS NULL AND @numDepto IS NOT NULL) OR (@piso IS NOT NULL OR @numDepto IS NULL))
+	IF ((@piso IS NULL AND @numDepto IS NOT NULL) OR (@piso IS NOT NULL AND @numDepto IS NULL))
 	BEGIN--Si no entra en el if es porque tanto @piso como @numDepto son nulos o no nulos.
-		RAISERROR('Error en el procedimiento almacenado agregarEmpleado. La dirección es inválida.',16,1);
+		RAISERROR('Error en el procedimiento almacenado agregarEmpleado. La dirección es inválida. Piso y Departamento',16,1);
 		RETURN;
 	END;
 
 	IF ((@piso IS NOT NULL AND @numDepto IS NOT NULL) AND (@piso < 0 OR @numDepto < 0))
 	BEGIN
-		RAISERROR('Error en el procedimiento almacenado agregarEmpleado. La dirección es inválida.',16,1);
+		RAISERROR('Error en el procedimiento almacenado agregarEmpleado. La dirección es inválida. Departamento y Piso',16,1);
 		RETURN;
 	END
 
-	IF (@calle IS NULL OR (LEN(LTRIM(RTRIM(@calle))) = 0 OR @numCalle<0 OR @localidad IS NULL OR  
-		LEN(LTRIM(RTRIM(@localidad))) = 0 OR @codPostal<0 OR @provincia IS NULL OR LEN(LTRIM(RTRIM(@provincia))) = 0))
+	IF (@calle IS NULL OR (LEN(LTRIM(RTRIM(@calle))) = 0 OR @numCalle IS NULL OR @numCalle<0 OR @localidad IS NULL OR  
+		LEN(LTRIM(RTRIM(@localidad))) = 0 OR @codPostal IS NULL OR @codPostal<0 OR @provincia IS NULL OR LEN(LTRIM(RTRIM(@provincia))) = 0))
 	BEGIN
 		RAISERROR('Error en el procedimiento almacenado agregarEmpleado. La direccion es inválida.',16,1);
 		RETURN;
@@ -204,7 +204,8 @@ AS BEGIN
 	--Buscamos si ya existe la dirección
 	SET @idDireccion = (SELECT idDireccion FROM Direccion.Direccion WHERE @calle like calle AND numeroDeCalle = @numCalle AND 
 							codigoPostal = @codPostal AND localidad like @localidad AND provincia like @provincia AND 
-							piso = @piso AND departamento = @numDepto);
+							((piso IS NULL AND @piso IS NULL) OR (piso=@piso)) AND
+							((departamento IS NULL AND @numDepto IS NULL) OR (departamento = @numDepto)));
 
 	IF (@idDireccion IS NULL)
 	BEGIN --La direccion no existe, entonces la agregaremos!
@@ -255,28 +256,36 @@ AS BEGIN
 		RETURN;
 
 	IF (@calle IS NOT NULL OR @numCalle IS NOT NULL OR @codPostal IS NOT NULL OR @localidad IS NOT NULL OR
-		@provincia IS NOT NULL OR (@piso IS NOT NULL AND @numDepto IS NOT NULL))--Se desea cambiar la dirección.
+		@provincia IS NOT NULL OR @piso IS NOT NULL OR @numDepto IS NOT NULL)--Se desea cambiar la dirección.
 	BEGIN
 		--Chequeamos si algún otro empleado ya vive en la vieja dirección.
 		SET @viejoIDDireccion = (SELECT idDireccion FROM Empleado.Empleado WHERE legajo = @legajo);
 		SET @cantHabitantes = (SELECT COUNT(idDireccion) FROM Empleado.Empleado WHERE idDireccion = @viejoIDDireccion);
 
-		IF (@cantHabitantes = 1)
-		BEGIN
-			UPDATE Empleado.Empleado
-					SET idDireccion = NULL
-					WHERE legajo = @legajo;
-			DELETE FROM Direccion.Direccion WHERE idDireccion = @viejoIDDireccion;
-		END
-
 		IF NOT EXISTS (SELECT 1 FROM Direccion.Direccion 
-						WHERE calle = @calle AND numeroDeCalle = @numCalle AND codigoPostal = @codPostal AND localidad = @localidad
-								AND provincia = @provincia AND piso = @piso AND departamento = @numDepto)
+			WHERE calle = @calle AND numeroDeCalle = @numCalle AND codigoPostal = @codPostal AND localidad = @localidad
+					AND provincia = @provincia AND piso = @piso AND departamento = @numDepto)
 		BEGIN--La dirección que se desea modificar no pertenece a ningún otro empleado.
 			INSERT INTO Direccion.Direccion(calle,numeroDeCalle,codigoPostal,localidad,provincia,piso,departamento)
 					VALUES(@calle,@numCalle,@codPostal,@localidad,@provincia,@piso,@numDepto);
 			SET @nuevoIDDireccion = (SELECT TOP(1) idDireccion FROM Direccion.Direccion ORDER BY idDireccion DESC)
 		END
+		
+		
+		IF (@cantHabitantes = 1)
+		BEGIN
+			UPDATE Direccion.Direccion
+					SET calle = COALESCE(@calle,calle),
+						numeroDeCalle = COALESCE(@numCalle,numeroDeCalle),
+						localidad = COALESCE(@localidad,localidad),
+						codigoPostal = COALESCE(@codPostal,codigoPostal),
+						piso = COALESCE(piso,@piso),
+						departamento = COALESCE(@numDepto,departamento),
+						provincia = COALESCE(@provincia,provincia)
+					WHERE idDireccion = @viejoIDDireccion;
+		END
+
+
 	END
 
 	UPDATE Empleado.Empleado
@@ -372,44 +381,46 @@ CREATE OR ALTER PROCEDURE Sucursal.agregarSucursal (@telefono VARCHAR(9),@horari
 AS BEGIN
 	DECLARE @idDireccion INT;
 
-	IF(@telefono LIKE '[0-9][0-9][0-9][0-9]-[0-9][0-9][0-9][0-9]')
+	IF(@telefono IS NULL OR @telefono NOT LIKE '[0-9][0-9][0-9][0-9]-[0-9][0-9][0-9][0-9]')
 	BEGIN
 		RAISERROR('Error en el procedimiento agregarSucursal. El teléfono es inválido.',16,2);
 		RETURN;
 	END
 
-	IF(LEN(LTRIM(RTRIM(@horario))) = 0)
+	IF(@horario IS NULL OR LEN(LTRIM(RTRIM(@horario))) = 0)
 	BEGIN
 		RAISERROR('Error en el procedimiento almacenado agregarSucursal. El horario es inválido.',16,2);
 		RETURN;
 	END
 
-	IF(LEN(LTRIM(RTRIM(@calle))) = 0)
+	IF(@calle IS NULL OR LEN(LTRIM(RTRIM(@calle))) = 0)
 	BEGIN
 		RAISERROR('Error en el procedimiento almacenado agregarSucursal. La calle es inválida.',16,2);
 		RETURN;
 	END
 
-	IF(@numeroDeCalle < 0)
+	IF(@numeroDeCalle IS NULL OR @numeroDeCalle < 0)
 	BEGIN
 		RAISERROR('Error en el procedimiento almacenado agregarSucursal. el numero de la calle es inválida',16,2);
 		RETURN;
 	END
 
-	IF(@codPostal < 0)
+	IF(@codPostal IS NULL OR @codPostal < 0)
 	BEGIN
 		RAISERROR('Error en el procedimiento almacenado agregarSucursal. El código postal es inválido.',16,2);
 		RETURN;
 	END
 
-	IF(LEN(LTRIM(RTRIM(@localidad))) = 0)
+	IF(@localidad IS NULL OR LEN(LTRIM(RTRIM(@localidad))) = 0)
 	BEGIN
 		RAISERROR('Error en el procedimiento almacenado agregarSucursal. La localidad es inválida.',16,2);
+		RETURN;
 	END
 
-	IF(LEN(LTRIM(RTRIM(@provincia))) = 0)
+	IF(@provincia IS NULL OR LEN(LTRIM(RTRIM(@provincia))) = 0)
 	BEGIN
 		RAISERROR('Error en el procedimiento almacenado agregarSucursal. La provincia es inválida.',16,2);
+		RETURN;
 	END
 	--Buscamos si ya existe la dirección
 	SET @idDireccion = (SELECT idDireccion FROM Direccion.Direccion 
@@ -437,31 +448,44 @@ CREATE OR ALTER PROCEDURE Sucursal.modificarSucursal (@idSucursal INT,@telefono 
 													@numeroDeCalle SMALLINT = NULL,@codPostal SMALLINT = NULL,
 													@localidad VARCHAR(255) = NULL,@provincia VARCHAR(255) = NULL)
 AS BEGIN
-	DECLARE @idDireccion INT = NULL;
-
+	DECLARE @idDireccionSucursal INT = NULL;
+	DECLARE @idDireccionABuscar INT;
 	IF NOT EXISTS (SELECT 1 FROM Sucursal.Sucursal WHERE idSucursal = @idSucursal)
-		RETURN;
-
-	IF(LEN(LTRIM(RTRIM(@calle))) > 0 OR @numeroDeCalle >= 0 OR @codPostal >= 0 OR 
-		LEN(LTRIM(RTRIM(@localidad))) > 0 OR LEN(LTRIM(RTRIM(@provincia))) > 0)
 	BEGIN
-		--Buscamos si ya existe la dirección.
-		SET @idDireccion = (SELECT idDireccion FROM Direccion.Direccion
-							WHERE calle LIKE @calle AND numeroDeCalle = @numeroDeCalle AND 
-							codigoPostal = @codPostal AND localidad LIKE @localidad AND provincia LIKE @provincia);
-		IF (@idDireccion IS NULL)
-			RETURN;
+		RAISERROR('Error en el procedimiento almacenado modificarSucursal. El id de la sucursal no existe',16,7);
+		RETURN;
+	END
+	IF (@calle IS NOT NULL OR @numeroDeCalle IS NOT NULL OR @codPostal IS NOT NULL OR
+		@localidad IS NOT NULL OR @provincia IS NOT NULL)
+	BEGIN
+		SET @idDireccionSucursal = (SELECT idDireccion FROM Sucursal.Sucursal WHERE idSucursal = @idSucursal);
+		--Buscamos si ya existe la dirección a la que se desea modificar.
+		SET @idDireccionABuscar = (SELECT idDireccion FROM Direccion.Direccion
+							WHERE calle LIKE COALESCE(@calle,calle) AND 
+							numeroDeCalle = COALESCE(@numeroDeCalle,numeroDeCalle) AND 
+							codigoPostal = COALESCE(@codPostal,codigoPostal) AND 
+							localidad LIKE COALESCE(@localidad,localidad) AND 
+							provincia LIKE COALESCE(@provincia,provincia) AND
+							idDireccion <> @idDireccionSucursal);
+		IF (@idDireccionABuscar IS NULL)
+		BEGIN--La dirección no existe.
+			UPDATE Direccion.Direccion
+				SET calle = COALESCE(@calle,calle),
+					numeroDeCalle = COALESCE(@numeroDeCalle,numeroDeCalle),
+					codigoPostal = COALESCE(@codPostal,codigoPostal),
+					localidad = COALESCE(@localidad,localidad),
+					provincia = COALESCE(@provincia,provincia)
+				WHERE idDireccion = @idDireccionSucursal;
+		END
 		ELSE
-		BEGIN--@idDireccion IS NOT NULL
-			INSERT INTO Direccion.Direccion (calle,numeroDeCalle,codigoPostal,localidad,provincia)
-					VALUES (@calle,@numeroDeCalle,@codPostal,@localidad,@provincia);
-			SET @idDireccion = (SELECT TOP(1) idDireccion FROM Direccion.Direccion ORDER BY idDireccion DESC);
+		BEGIN--La dirección ya está registrado por una sucursal o un empleado.
+			RAISERROR('Error en el procedimiento almacenado modificarSucursal. La dirección ya está registrada',16,7);
+			RETURN;
 		END
 	END
 
 	UPDATE Sucursal.Sucursal
 		SET telefono = COALESCE(@telefono,telefono),
-			idDireccion = COALESCE(@idDireccion,idDireccion),
 			horario = COALESCE(@horario,horario)
 		WHERE idSucursal = @idSucursal;
 END;
@@ -514,6 +538,12 @@ AS BEGIN
 						WHERE nombreCargo = @nombreCargo)
 	BEGIN
 		RAISERROR('Error en el procedimiento almacenado agregarCargo. el cargo ya se encuentra ingresado',16,3);
+		RETURN;
+	END
+
+	IF(@nombreCargo IS NULL OR LEN(LTRIM(RTRIM(@nombreCargo))) = 0)
+	BEGIN
+		RAISERROR('Error en el procedimiento almacenado agregarCargo. El nombre del cargo es inválido.',16,3);
 		RETURN;
 	END
 
