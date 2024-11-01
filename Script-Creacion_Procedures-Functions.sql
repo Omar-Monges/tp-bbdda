@@ -1,195 +1,311 @@
-﻿IF EXISTS (SELECT * FROM sys.databases WHERE name = 'G2900G19')
+﻿/*
+--Lista Codigo de errores:
+	1 -> agregarEmpleado
+	2 -> agregarSucursal
+	3 -> agregarCargo
+	4 -> agregarTurno
+
+--Esquema Dirección
+	verDireccionesDeEmpleados ->vemos las direcciones de los empleados
+	verDireccionesDeSucursales -> vemos las direcciones de las sucursales
+	
+--Esquema Empleado
+	calcularCUIL -> devuelve el CUIL de un empleado
+
+	agregarEmpleado
+	modificarEmpleado
+	eliminarEmpleado
+
+	verDatosEmpleados -> vemos los datos de los empleados junto a su turno,cargo y sucursal en la que trabaja.
+	verDatosPersonalesDeEmpleados -> vemos los datos personales
+
+--Esquema Sucursal
+	Tabla Sucursal	
+		agregarSucursal
+		modificarSucursal
+		eliminarSucursal
+
+		verSucursales
+		verEmpleadosDeSucursales
+	Tabla Cargo
+		agregarCargo
+		modificarCargo
+		eliminarCargo
+
+		verCargosDeEmpleados
+	Tabla Turno
+		agregarTurno
+		modificarTurno
+		eliminarTurno
+
+		verTurnosDeEmpleados
+--Esquema Producto
+	Tabla Producto
+		agregarProducto
+		modificarProducto
+		eliminarProducto
+
+		pasajeDolarAPesos
+
+		verProductos ->muestra a los productos con sus categorias
+	Tabla TipoDeProducto
+		agregarTipoDeProducto
+		modificarTipoDeProducto
+		eliminarTipoDeProducto
+
+--Esquema Factura
+*/
+IF EXISTS (SELECT * FROM sys.databases WHERE name = 'G2900G19')
 	USE G2900G19
 ELSE
 	RAISERROR('Este script está diseñado para que se ejecute despues del script de la creacion de tablas y esquemas.',20,1)
 GO
 --USE master
 --DROP DATABASE G2900G19
+------------------------------------------------Esquema Dirección------------------------------------------------
+--Ver los domicilios de todos los empleados.
+--DROP VIEW Direccion.verDomiciliosDeEmpleados
+--SELECT * FROM Direccion.verDomiciliosDeEmpleados
+CREATE OR ALTER VIEW Direccion.verDomiciliosDeEmpleados AS
+	SELECT e.legajo,d.* FROM Empleado.Empleado e JOIN Direccion.Direccion d ON e.idDireccion = d.idDireccion;
+GO
+--Ver las direcciones de todas las sucursales
+--DROP VIEW Direccion.verDireccionesDeSucursales
+--SELECT *  FROM Direccion.verDireccionesDeSucursales
+CREATE OR ALTER VIEW Direccion.verDireccionesDeSucursales AS
+	SELECT s.idSucursal,d.* FROM Sucursal.Sucursal s JOIN Direccion.Direccion d ON d.idDireccion = s.idDireccion;
+GO
 ------------------------------------------------Esquema Empleado------------------------------------------------
 --Calcula el cuil de un empleado mediante un DNI y el Sexo:
 --	DROP FUNCTION Empleado.calcularCUIL		<--- ¡Primero borrar el procedure agregarEmpleado!
 --	DROP PROCEDURE Empleado.agregarEmpleado
 --	PRINT Empleado.calcularCUIL('42781944','M')
-CREATE OR ALTER FUNCTION Empleado.calcularCUIL (@DNI VARCHAR(8), @Sexo CHAR(1))
+CREATE OR ALTER FUNCTION Empleado.calcularCUIL (@dni VARCHAR(8), @sexo CHAR(1))
 RETURNS VARCHAR(13)
 AS BEGIN
-	DECLARE @Aux VARCHAR(10) = '5432765432',
-			@DNIAux VARCHAR(10);
-	DECLARE @DigInt TINYINT,
-			@CursorIndice TINYINT = 1,
-			@Resto TINYINT;
-	DECLARE @Sumador SMALLINT=0;
-	DECLARE @Prefijo VARCHAR(2);
+	DECLARE @aux VARCHAR(10) = '5432765432',
+			@dniAux VARCHAR(10);
+	DECLARE @digInt TINYINT,
+			@cursorIndice TINYINT = 1,
+			@resto TINYINT;
+	DECLARE @sumador SMALLINT = 0;
+	DECLARE @prefijo VARCHAR(2);
 
-	IF (@Sexo = 'F')
-		SET @Prefijo = '27';
+	IF (@sexo = 'F')
+		SET @prefijo = '27';
 	ELSE
-		SET @Prefijo = '20';
-	SET @DNIAux = @Prefijo + @DNI;
-	WHILE (@CursorIndice <= LEN(@DNIAux))
+		SET @prefijo = '20';
+	SET @dniAux = @prefijo + @DNI;
+	WHILE (@cursorIndice <= LEN(@dniAux))
 	BEGIN
-		SET @DigInt = CAST(SUBSTRING(@DNIAux,@CursorIndice,1) AS TINYINT);
-		SET @Sumador = @Sumador + (@DigInt * CAST(SUBSTRING(@Aux,@CursorIndice,1) AS TINYINT));
-		SET @CursorIndice = @CursorIndice + 1;
+		SET @digInt = CAST(SUBSTRING(@dniAux,@cursorIndice,1) AS TINYINT);
+		SET @sumador = @sumador + (@digInt * CAST(SUBSTRING(@aux,@cursorIndice,1) AS TINYINT));
+		SET @cursorIndice = @cursorIndice + 1;
 	END;
-	SET @Resto = @Sumador % 11;
-	IF (@Resto = 0)
-		RETURN @Prefijo+'-'+@DNI+'-0';
-	IF(@Resto =1)
+	SET @resto = @sumador % 11;
+	IF (@resto = 0)
+		RETURN @prefijo + '-' + @dni+'-0';
+	IF(@resto = 1)
 	BEGIN
-		IF (@Sexo = 'M')
-			RETURN '23-'+@DNI+'-9';
-		RETURN '23-'+@DNI+'-4';
+		IF (@sexo = 'M')
+			RETURN '23-' + @dni + '-9';
+		RETURN '23-' + @dni + '-4';
 	END
-	RETURN @Prefijo+'-'+@DNI+'-'+CAST((11-@Resto) AS CHAR);
+	RETURN @prefijo + '-' + @dni + '-' + CAST((11-@resto) AS CHAR);
 END
 GO
 --Agregar un Empleado
 --Drop Empleado.agregarEmpleado
-CREATE OR ALTER PROCEDURE Empleado.agregarEmpleado (@DNI VARCHAR(8),@Nombre VARCHAR(50),@Apellido VARCHAR(50),@Sexo CHAR(1),
-										@EmailPersonal VARCHAR(50),@EmailEmpresa VARCHAR(50),@IDSucursal INT,
-										@IDTurno INT,@IDCargo INT,@Calle VARCHAR(255),@NumCalle SMALLINT,@CodPostal SMALLINT,
-										@Localidad VARCHAR(255),@Piso TINYINT = NULL,@Departamento TINYINT)
+CREATE OR ALTER PROCEDURE Empleado.agregarEmpleado (@dni VARCHAR(8),@nombre VARCHAR(50),@apellido VARCHAR(50),@sexo CHAR(1),
+													@emailPersonal VARCHAR(50),@emailEmpresa VARCHAR(50),@idSucursal INT,
+													@idTurno INT,@idCargo INT,@calle VARCHAR(255),@numCalle SMALLINT,@codPostal SMALLINT,
+													@localidad VARCHAR(255),@provincia VARCHAR(255),@piso TINYINT = NULL,@numDepto TINYINT)
 AS BEGIN
-	DECLARE @IDDireccion INT;
+	DECLARE @idDireccion INT;
+	DECLARE @cuil VARCHAR(13);
 
-	IF (@DNI NOT LIKE '[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]')
+	IF (@dni NOT LIKE '[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]')
 	BEGIN
-		RAISERROR('Error en el procedimiento agregarEmpleado. El DNI es inválido.',16,1);
+		RAISERROR('Error en el procedimiento almacenado agregarEmpleado. El DNI es inválido.',16,1);
 		RETURN;
 	END;
 
-	IF (@Nombre IS NULL OR LEN(LTRIM(RTRIM(@Nombre))) = 0)
+	IF (LEN(LTRIM(RTRIM(@nombre))) = 0)
 	BEGIN
-		RAISERROR('Error en el procedimiento agregarEmpleado. El Nombre es inválido.',16,1);
+		RAISERROR('Error en el procedimiento almacenado agregarEmpleado. El Nombre es inválido.',16,1);
 		RETURN;
 	END;
 
-	IF (@Apellido IS NULL OR LEN(LTRIM(RTRIM(@Nombre))) = 0)
+	IF (LEN(LTRIM(RTRIM(@apellido))) = 0)
 	BEGIN
-		RAISERROR('Error en el procedimiento agregarEmpleado. El Apellido es inválido.',16,1);
+		RAISERROR('Error en el procedimiento almacenado agregarEmpleado. El Apellido es inválido.',16,1);
 		RETURN;
 	END;
 
-	IF (@Sexo NOT IN ('M','F'))
+	IF (@sexo NOT IN ('M','F'))
 	BEGIN
-		RAISERROR('Error en el procedimiento agregarEmpleado. El sexo es inválido.',16,1);
+		RAISERROR('Error en el procedimiento almacenado agregarEmpleado. El sexo es inválido.',16,1);
 		RETURN;
 	END
 
-	IF (@EmailPersonal NOT LIKE '%@%.com')
+	IF (@emailPersonal NOT LIKE '%@%.com')
 	BEGIN
-		RAISERROR('Error en el procedimiento agregarEmpleado. El Email Personal es inválido.',16,1);
+		RAISERROR('Error en el procedimiento almacenado agregarEmpleado. El Email Personal es inválido.',16,1);
 		RETURN;
 	END;
 
-	IF (@EmailEmpresa NOT LIKE '%@super.com')
+	IF (@emailEmpresa NOT LIKE '%@aurora.com')
 	BEGIN
-		RAISERROR('Error en el procedimiento agregarEmpleado. El Email de la Empresa tiene un formato inválido.',16,1);
+		RAISERROR('Error en el procedimiento almacenado agregarEmpleado. El Email Empresarial tiene un formato inválido.',16,1);
 		RETURN;
 	END;
 
-	IF (@IDSucursal NOT IN (Select IDSucursal FROM Sucursal.Sucursal))
+	IF (@idSucursal NOT IN (Select idSucursal FROM Sucursal.Sucursal))
 	BEGIN
-		RAISERROR('Error en el procedimiento agregarEmpleado. El ID de la sucursal no existe.',16,1);
+		RAISERROR('Error en el procedimiento almacenado agregarEmpleado. El ID de la sucursal no existe.',16,1);
 		RETURN;
 	END;
 
-	IF (@IDTurno NOT IN (SELECT IDTurno FROM Sucursal.Turno))
+	IF (@idTurno NOT IN (SELECT idTurno FROM Sucursal.Turno))
 	BEGIN
-		RAISERROR('Error en el procedimiento agregarEmpleado. El ID del turno no existe.',16,1);
+		RAISERROR('Error en el procedimiento almacenado agregarEmpleado. El ID del turno no existe.',16,1);
 		RETURN;
 	END;
 
-	IF (@IDCargo NOT IN (SELECT IDCargo FROM Sucursal.Cargo))
+	IF (@idCargo NOT IN (SELECT idCargo FROM Sucursal.Cargo))
 	BEGIN
-		RAISERROR('Error en el procedimiento agregarEmpleado. El ID del cargo no existe.',16,1);
+		RAISERROR('Error en el procedimiento almacenado agregarEmpleado. El ID del cargo no existe.',16,1);
 		RETURN;
 	END;
 	
-	IF ((@Piso IS NULL AND @Departamento IS NOT NULL) OR (@Piso IS NOT NULL OR @Departamento IS NULL))
-	BEGIN
-		RAISERROR('Error en el procedimiento agregarEmpleado. La dirección es inválida.',16,1);
+	IF ((@piso IS NULL AND @numDepto IS NOT NULL) OR (@piso IS NOT NULL OR @numDepto IS NULL))
+	BEGIN--Si no entra en el if es porque tanto @piso como @numDepto son nulos o no nulos.
+		RAISERROR('Error en el procedimiento almacenado agregarEmpleado. La dirección es inválida.',16,1);
 		RETURN;
 	END;
 
-	IF ((@Calle IS NULL OR LEN(LTRIM(RTRIM(@Calle))) = 0) OR (@NumCalle IS NULL OR @NumCalle<0)
-		OR (@Localidad IS NULL OR LEN(LTRIM(RTRIM(@Localidad))) = 0) OR (@CodPostal IS NULL OR @CodPostal<0))
+	IF ((@piso IS NOT NULL AND @numDepto IS NOT NULL) AND (@piso < 0 OR @numDepto < 0))
 	BEGIN
-		RAISERROR('Error en el procedimiento agregarEmpleado. La direccion es inválida.',16,1);
+		RAISERROR('Error en el procedimiento almacenado agregarEmpleado. La dirección es inválida.',16,1);
+		RETURN;
+	END
+
+	IF ((LEN(LTRIM(RTRIM(@calle))) = 0) OR (@numCalle<0) OR (LEN(LTRIM(RTRIM(@localidad))) = 0) 
+		OR (@codPostal<0) OR LEN(LTRIM(RTRIM(@provincia))) = 0)
+	BEGIN
+		RAISERROR('Error en el procedimiento almacenado agregarEmpleado. La direccion es inválida.',16,1);
 		RETURN;
 	END;
+	--Buscamos si ya existe la dirección
+	SET @idDireccion = (SELECT idDireccion FROM Direccion.Direccion WHERE
+							@calle like calle AND numeroDeCalle = @numCalle AND codigoPostal = @codPostal AND localidad like @localidad
+							AND provincia like @provincia AND piso = @piso AND departamento = @numDepto);
 
-	IF (@Piso IS NULL AND @Departamento IS NULL) --Si los dos son NULL es porque NO es un edificio
-	BEGIN
-		IF NOT EXISTS(SELECT 1 FROM Direccion.Direccion 
-						WHERE Localidad <> @Localidad OR CodPostal <> @CodPostal OR Calle <> @Calle OR Numero <> @NumCalle)
-		BEGIN--NO existe la direccion
-				INSERT INTO Direccion.Direccion(Calle,Numero,CodPostal,Localidad,Piso,Departamento) VALUES
-					(@Calle,@NumCalle,@CodPostal,@Localidad,@Piso,@Departamento);
-		END
+	IF (@idDireccion IS NULL)
+	BEGIN --La direccion no existe, entonces la agregaremos!
+		INSERT INTO Direccion.Direccion(calle,numeroDeCalle,codigoPostal,piso,departamento,localidad,provincia) 
+					VALUES(@calle,@numCalle,@codPostal,@piso,@numDepto,@localidad,@provincia);
+		--Buscamos el id de la direccion agregada
+		SET @idDireccion = (SELECT TOP(1) idDireccion FROM Direccion.Direccion ORDER BY idDireccion DESC);
 	END
-	ELSE --Si entra en el else el domicilio es un edificio!
+	ELSE--@idDireccion IS NOT NULL
 	BEGIN
-		IF EXISTS (SELECT 1 FROM Direccion.Direccion 
-				WHERE  Localidad <> @Localidad OR CodPostal = @CodPostal OR Calle = @Calle OR Numero <> @NumCalle OR
-						Piso <> @Piso OR Departamento <> @Departamento)--Si piso o departamento son diferentes es una nueva direccion!
-		BEGIN--NO existe la direccion
-				INSERT INTO Direccion.Direccion(Calle,Numero,CodPostal,Localidad,Piso,Departamento) VALUES
-					(@Calle,@NumCalle,@CodPostal,@Localidad,@Piso,@Departamento)
+		IF EXISTS (SELECT 1 FROM Sucursal.Sucursal WHERE idDireccion = @idDireccion)
+		BEGIN
+			RAISERROR('Error en el procedimiento almacenado agregarEmpleado. La dirección pertenece a una sucursal.',16,1);
+			RETURN;
 		END
-	END
+	END;
 
-	SET @IDDireccion = (SELECT DISTINCT IDDireccion FROM Direccion.Direccion 
-						WHERE Numero = @NumCalle AND Calle LIKE @Calle AND CodPostal = @CodPostal AND Localidad LIKE @Localidad);
+	SET @cuil = Empleado.calcularCUIL(@dni,@sexo);
 
-	INSERT INTO Empleado.Empleado(DNI,Nombre,Apellido,IDDireccion,EmailPersonal,EmailEmpresa,IDSucursal,IDTurno,IDCargo,CUIL) 
-	VALUES(@DNI,@Nombre,@Apellido,@IDDireccion,@EmailPersonal,@EmailEmpresa,@IDSucursal,@IDTurno,@IDCargo,Empleado.calcularCuil(@DNI,@Sexo))
+	INSERT INTO Empleado.Empleado(dni,nombre,apellido,idDireccion,emailPersonal,emailEmpresarial,idSucursal,idTurno,idCargo,cuil) 
+				VALUES(@dni,@nombre,@apellido,@idDireccion,@emailPersonal,@emailEmpresa,@idSucursal,@idTurno,@idCargo,@cuil);
 END;
 GO
 ---Modificar Empleado
 --DROP PROCEDURE Empleado.modificarEmpleado
-CREATE OR ALTER PROCEDURE Empleado.modificarEmpleado(@Legajo INT, @IDDireccion INT = NULL,@EmailPersonal VARCHAR(255)=NULL,
-													@IDTurno INT=NULL,@IDCargo INT=NULL)
+CREATE OR ALTER PROCEDURE Empleado.modificarEmpleado(@legajo INT,@nombre VARCHAR(255),@apellido VARCHAR(255) = NULL,
+													@emailPersonal VARCHAR(255)=NULL,@emailEmpresarial VARCHAR(255)=NULL,
+													@idTurno INT=NULL,@idCargo INT=NULL,
+													@calle VARCHAR(255) = NULL, @numCalle SMALLINT = NULL,@codPostal SMALLINT = NULL, 
+													@localidad VARCHAR(255) = NULL, @provincia VARCHAR(255) = NULL,
+													@piso TINYINT = NULL, @numDepto TINYINT = NULL)
 AS BEGIN
+	DECLARE @viejoIDDireccion INT,
+			@cantHabitantes INT,
+			@nuevoIDDireccion INT = NULL;
+
+	IF(@legajo IS NULL OR NOT EXISTS (SELECT 1 FROM Empleado.Empleado WHERE legajo = @legajo))
+		RETURN;
+		
+	IF(@calle IS NOT NULL OR @numCalle IS NOT NULL OR @codPostal IS NOT NULL OR @localidad IS NOT NULL OR
+		@provincia IS NOT NULL OR (@piso IS NOT NULL AND @numDepto IS NOT NULL))--Se desea cambiar la dirección.
+	BEGIN
+		--Chequeamos si algún otro empleado ya vive en la vieja dirección.
+		SET @viejoIDDireccion = (SELECT idDireccion FROM Empleado.Empleado WHERE legajo = @legajo);
+		SET @cantHabitantes = (SELECT COUNT(idDireccion) FROM Empleado.Empleado WHERE idDireccion = @viejoIDDireccion);
+
+		IF (@cantHabitantes = 1)
+		BEGIN
+			UPDATE Empleado.Empleado
+					SET idDireccion = NULL
+					WHERE legajo = @legajo;
+			DELETE FROM Direccion.Direccion WHERE idDireccion = @viejoIDDireccion;
+		END
+
+		IF NOT EXISTS (SELECT 1 FROM Direccion.Direccion 
+						WHERE calle = @calle AND numeroDeCalle = @numCalle AND codigoPostal = @codPostal AND localidad = @localidad
+								AND provincia = @provincia AND piso = @piso AND departamento = @numDepto)
+		BEGIN--La dirección que se desea modificar no pertenece a ningún otro empleado.
+			INSERT INTO Direccion.Direccion(calle,numeroDeCalle,codigoPostal,localidad,provincia,piso,departamento)
+					VALUES(@calle,@numCalle,@codPostal,@localidad,@provincia,@piso,@numDepto);
+			SET @nuevoIDDireccion = (SELECT TOP(1) idDireccion FROM Direccion.Direccion ORDER BY idDireccion DESC)
+		END
+	END
+
 	UPDATE Empleado.Empleado
-	SET IDDireccion = COALESCE(@IDDireccion,IDDireccion),
-		EmailPersonal = COALESCE(@EmailPersonal,EmailPersonal),
-		IDTurno = COALESCE(@IDTurno,IDTurno),
-		IDCargo = COALESCE(@IDCargo,IDCargo)
-	WHERE Legajo = @Legajo;
+			SET nombre = COALESCE(@nombre,nombre),
+				apellido = COALESCE(@apellido,apellido),
+				emailPersonal = COALESCE(@emailPersonal,emailPersonal),
+				emailEmpresarial = COALESCE(@emailEmpresarial,emailEmpresarial),
+				idTurno = COALESCE(@idTurno,idTurno),
+				idCargo = COALESCE(@idCargo,idCargo),
+				idDireccion = COALESCE(@nuevoIDDireccion,idDireccion)
+			WHERE legajo = @legajo;
 END
 GO
 --Eliminar Empleado
 --DROP PROCEDURE Empleado.eliminarEmpleado
-CREATE OR ALTER PROCEDURE Empleado.eliminarEmpleado(@Legajo INT)
+CREATE OR ALTER PROCEDURE Empleado.eliminarEmpleado(@legajo INT)
 AS BEGIN
-	IF (@Legajo IS NULL)
-		RETURN;
+	DECLARE @cantHabitantes TINYINT;
+	DECLARE @idDireccion INT;
 
+	IF (@Legajo IS NULL OR NOT EXISTS (SELECT 1 from Empleado.Empleado where legajo = @legajo))
+		RETURN;
+	--Eliminamos solamente el legajo de los empleados en las facturas.
+	UPDATE Factura.Factura
+			SET legajoEmpleado = NULL
+			WHERE legajoEmpleado = @legajo;
+	
+	SET @idDireccion = (SELECT idDireccion FROM Empleado.Empleado WHERE legajo = @legajo)
+	SET @cantHabitantes = (SELECT COUNT(idDireccion) FROM Empleado.Empleado WHERE idDireccion = @idDireccion);
+		
 	ALTER TABLE Empleado.Empleado
 		DROP CONSTRAINT PK_Empleado;
-	ALTER TABLE Factura.Factura
-		DROP CONSTRAINT FK_FacturaEmpleadoM;
-	ALTER TABLE Direccion.Direccion
-		DROP CONSTRAINT PK_Direccion;
 
-	
-		
-	DELETE FROM Direccion.Direccion 
-		WHERE Direccion.IDDireccion = (SELECT DISTINCT e.IDDireccion FROM Empleado.Empleado e WHERE Legajo = @Legajo);
-	UPDATE Factura.Factura
-		SET LegajoEmpleado = NULL
-		WHERE LegajoEmpleado = @Legajo;
 	DELETE FROM Empleado.Empleado
-		WHERE Legajo = @Legajo;
+				WHERE legajo = @legajo;
 
 	ALTER TABLE Empleado.Empleado
-		ADD CONSTRAINT PK_Empleado PRIMARY KEY(Legajo); 
-	ALTER TABLE Factura.Factura
-		ADD CONSTRAINT FK_FacturaEmpleado FOREIGN KEY(LegajoEmpleado) REFERENCES Empleado.Empleado(Legajo);
-	ALTER TABLE Direccion.Direccion
-		ADD CONSTRAINT PK_Direccion PRIMARY KEY(IDDireccion);
+		ADD CONSTRAINT PK_Empleado PRIMARY KEY(legajo);
+
+	IF (@cantHabitantes = 1)
+	BEGIN
+		DELETE FROM Direccion.Direccion
+					WHERE idDireccion = @idDireccion;
+	END	
 END
 GO
 --Ver toda la tabla de empleados junto a su turno,cargo y sucursal en la que trabaja.
@@ -198,34 +314,34 @@ GO
 CREATE OR ALTER VIEW Empleado.verDatosDeEmpleados AS
 	WITH EmpleadoCTE AS
 	(
-		SELECT Legajo,IDSucursal,IDCargo,IDTurno
+		SELECT legajo,idSucursal,idCargo,idTurno
 			FROM Empleado.Empleado
-	),CargoEmpleado (Legajo,IDSucursal,IDTurno,Cargo) AS
+	),CargoEmpleado (legajo,idSucursal,idTurno,cargo) AS
 	(
-		SELECT e.Legajo,e.IDSucursal,e.IDTurno,c.Descripcion 
-			FROM Sucursal.Cargo c JOIN EmpleadoCTE e ON c.IDCargo = e.IDCargo
-	),SucursalEmpleado (Legajo,IDTurno,Cargo,LocalidadSucursal) AS
+		SELECT e.legajo,e.idSucursal,e.idTurno,c.nombreCargo 
+			FROM Sucursal.cargo c JOIN EmpleadoCTE e ON c.idCargo = e.idCargo
+	),SucursalEmpleado (legajo,idTurno,cargo,localidadSucursal) AS
 	(
-		SELECT Legajo,IDTurno,Cargo,d.Localidad
+		SELECT legajo,idTurno,cargo,d.localidad
 			FROM 
 			(
-				SELECT Legajo,IDTurno,s.IDDireccion,Cargo 
-					FROM Sucursal.Sucursal s JOIN CargoEmpleado c ON s.IDSucursal = c.IDSucursal
-			) AS T JOIN Direccion.Direccion d ON d.IDDireccion = T.IDDireccion
-	),TurnoEmpleado (Legajo,Cargo,LocalidadSucursal,Turno) AS
+				SELECT legajo,idTurno,s.idDireccion,cargo 
+					FROM Sucursal.Sucursal s JOIN CargoEmpleado c ON s.idSucursal = c.idSucursal
+			) AS T JOIN Direccion.Direccion d ON d.idDireccion = T.idDireccion
+	),TurnoEmpleado (legajo,cargo,localidadSucursal,turno) AS
 	(
-		SELECT Legajo,Cargo,LocalidadSucursal,t.Descripcion 
-			FROM Sucursal.Turno t JOIN SucursalEmpleado e ON t.IDTurno = e.IDTurno
+		SELECT Legajo,cargo,localidadSucursal,t.nombreTurno 
+			FROM Sucursal.Turno t JOIN SucursalEmpleado e ON t.idTurno = e.idTurno
 	),DatosEmpleado AS
 	(
-		SELECT Empl.*,t.Cargo,t.LocalidadSucursal,t.Turno
+		SELECT Empl.*,t.cargo,t.localidadSucursal,t.turno
 		FROM
 		(
-			SELECT e.Legajo,e.CUIL,e.Apellido,e.Nombre,e.EmailPersonal,e.EmailEmpresa,d.Calle,
-					d.Numero,COALESCE(d.Piso,'-') AS Piso,COALESCE(d.Departamento,'-') AS Departamento,
-					d.CodPostal,d.Localidad AS Ciudad
-				FROM Empleado.Empleado e JOIN Direccion.Direccion d ON e.IDDireccion = e.IDDireccion
-		) AS Empl JOIN TurnoEmpleado t ON Empl.Legajo = t.Legajo
+			SELECT e.legajo,e.cuil,e.apellido,e.nombre,e.emailPersonal,e.emailEmpresarial,d.calle,
+					d.numeroDeCalle,COALESCE(d.Piso,'-') AS Piso,COALESCE(d.departamento,'-') AS Departamento,
+					d.codigoPostal,d.localidad AS Ciudad
+				FROM Empleado.Empleado e JOIN Direccion.Direccion d ON e.idDireccion = e.idDireccion
+		) AS Empl JOIN TurnoEmpleado t ON Empl.legajo = t.legajo
 	)
 	SELECT * FROM DatosEmpleado;
 GO
@@ -233,36 +349,294 @@ GO
 --DROP VIEW Empleado.verDatosPersonalesDeEmpleados
 --SELECT * FROM Empleado.verDatosPersonalesDeEmpleados
 CREATE OR ALTER VIEW Empleado.verDatosPersonalesDeEmpleados AS
-	SELECT e.Legajo,e.Apellido,e.Nombre,e.CUIL,e.EmailEmpresa,e.EmailPersonal,
-			d.Calle,d.Numero,d.CodPostal,COALESCE(d.Piso,'-') AS Piso,COALESCE(d.Departamento,'-') AS Departamento
-		FROM Empleado.Empleado  e JOIN Direccion.Direccion d ON e.IDDireccion = d.IDDireccion
+	SELECT e.legajo,e.apellido,e.nombre,e.cuil,e.emailEmpresarial,e.emailPersonal,
+			d.calle,d.numeroDeCalle,d.codigoPostal,COALESCE(d.piso,'-') AS Piso,COALESCE(d.departamento,'-') AS Departamento
+		FROM Empleado.Empleado  e JOIN Direccion.Direccion d ON e.idDireccion = d.idDireccion
 GO
-------------------------------------------------Producto------------------------------------------------
---Procedimiento almacenado para agregar una categoría de los productos
---SELECT name,collation_name from sys.databases
---DROP PROCEDURE Producto.AgregarTipoDeProducto;
-CREATE OR ALTER PROCEDURE Producto.agregarTipoDeProducto (@Descripcion VARCHAR(255))
+------------------------------------------------Esquema Sucursal------------------------------------------------
+--Tabla Sucursal
+--	Procedimiento almacenado que permite agregar una sucursal.
+--	DROP PROCEDURE Sucursal.agregarSucursal
+CREATE OR ALTER PROCEDURE Sucursal.agregarSucursal (@telefono VARCHAR(9),@horario VARCHAR(255),
+													@calle VARCHAR(255),@numeroDeCalle SMALLINT,@codPostal SMALLINT,
+													@localidad VARCHAR(255),@provincia VARCHAR(255))
 AS BEGIN
-	IF EXISTS (SELECT 1 FROM Producto.TipoDeProducto 
-				WHERE Descripcion LIKE @Descripcion COLLATE Modern_Spanish_CI_AI)
+	DECLARE @idDireccion INT;
+
+	IF(@telefono LIKE '[0-9][0-9][0-9][0-9]-[0-9][0-9][0-9][0-9]')
 	BEGIN
-		RAISERROR('Error en el procedimiento almacenado "AgregarTipoDeProducto". La descripción ya se encuentra ingresada.',16,1);
+		RAISERROR('Error en el procedimiento agregarSucursal. El teléfono es inválido.',16,2);
 		RETURN;
 	END
-	INSERT INTO Producto.TipoDeProducto(Descripcion) VALUES (@Descripcion);
+
+	IF(LEN(LTRIM(RTRIM(@horario))) = 0)
+	BEGIN
+		RAISERROR('Error en el procedimiento almacenado agregarSucursal. El horario es inválido.',16,2);
+		RETURN;
+	END
+
+	IF(LEN(LTRIM(RTRIM(@calle))) = 0)
+	BEGIN
+		RAISERROR('Error en el procedimiento almacenado agregarSucursal. La calle es inválida.',16,2);
+		RETURN;
+	END
+
+	IF(@numeroDeCalle < 0)
+	BEGIN
+		RAISERROR('Error en el procedimiento almacenado agregarSucursal. el numero de la calle es inválida',16,2);
+		RETURN;
+	END
+
+	IF(@codPostal < 0)
+	BEGIN
+		RAISERROR('Error en el procedimiento almacenado agregarSucursal. El código postal es inválido.',16,2);
+		RETURN;
+	END
+
+	IF(LEN(LTRIM(RTRIM(@localidad))) = 0)
+	BEGIN
+		RAISERROR('Error en el procedimiento almacenado agregarSucursal. La localidad es inválida.',16,2);
+	END
+
+	IF(LEN(LTRIM(RTRIM(@provincia))) = 0)
+	BEGIN
+		RAISERROR('Error en el procedimiento almacenado agregarSucursal. La provincia es inválida.',16,2);
+	END
+	--Buscamos si ya existe la dirección
+	SET @idDireccion = (SELECT idDireccion FROM Direccion.Direccion 
+						WHERE calle like @calle AND numeroDeCalle = @numeroDeCalle AND codigoPostal = @codPostal AND
+						localidad like @localidad AND provincia like @provincia);
+
+	IF (@idDireccion IS NOT NULL)
+	BEGIN
+		RAISERROR('Error en el procedimiento almacenado agregarSucursal. La dirección ya existe.',16,2);
+		RETURN;
+	END
+	
+	INSERT INTO Direccion.Direccion (calle,numeroDeCalle,codigoPostal,localidad,provincia) 
+			VALUES (@calle,@numeroDeCalle,@codPostal,@localidad,@provincia);
+	SET @idDireccion = (SELECT TOP(1) idDireccion FROM Direccion.Direccion ORDER BY idDireccion DESC);
+	
+	INSERT INTO Sucursal.Sucursal (telefono,horario,idDireccion)
+			VALUES (@telefono,@horario,@idDireccion);
 END
 GO
---Vista para ver los productos junto a su categoría
---DROP VIEW Producto.VerListadoDeProductos
---SELECT * FROM Producto.VerListadoDeProductos
-CREATE OR ALTER VIEW Producto.verListadoDeProductos AS
-	SELECT IDProducto,PrecioUnitario,PrecioReferencia,UnidadReferencia,t.Descripcion
-		FROM Producto.Producto p JOIN Producto.TipoDeProducto t ON p.IDTipoDeProd = t.IDTipoDeProd;
+--	Procedimiento almacenado que permite modificar una sucursal.
+--	DROP PROCEDURE Sucursal.modificarSucursal
+CREATE OR ALTER PROCEDURE Sucursal.modificarSucursal (@idSucursal INT,@telefono VARCHAR(9) = NULL,
+													@horario VARCHAR(255) = NULL,@calle VARCHAR(255) = NULL,
+													@numeroDeCalle SMALLINT = NULL,@codPostal SMALLINT = NULL,
+													@localidad VARCHAR(255) = NULL,@provincia VARCHAR(255) = NULL)
+AS BEGIN
+	DECLARE @idDireccion INT = NULL;
+
+	IF NOT EXISTS (SELECT 1 FROM Sucursal.Sucursal WHERE idSucursal = @idSucursal)
+		RETURN;
+
+	IF(LEN(LTRIM(RTRIM(@calle))) > 0 OR @numeroDeCalle >= 0 OR @codPostal >= 0 OR 
+		LEN(LTRIM(RTRIM(@localidad))) > 0 OR LEN(LTRIM(RTRIM(@provincia))) > 0)
+	BEGIN
+		--Buscamos si ya existe la dirección.
+		SET @idDireccion = (SELECT idDireccion FROM Direccion.Direccion
+							WHERE calle LIKE @calle AND numeroDeCalle = @numeroDeCalle AND 
+							codigoPostal = @codPostal AND localidad LIKE @localidad AND provincia LIKE @provincia);
+		IF (@idDireccion IS NULL)
+			RETURN;
+		ELSE
+		BEGIN--@idDireccion IS NOT NULL
+			INSERT INTO Direccion.Direccion (calle,numeroDeCalle,codigoPostal,localidad,provincia)
+					VALUES (@calle,@numeroDeCalle,@codPostal,@localidad,@provincia);
+			SET @idDireccion = (SELECT TOP(1) idDireccion FROM Direccion.Direccion ORDER BY idDireccion DESC);
+		END
+	END
+
+	UPDATE Sucursal.Sucursal
+		SET telefono = COALESCE(@telefono,telefono),
+			idDireccion = COALESCE(@idDireccion,idDireccion),
+			horario = COALESCE(@horario,horario)
+		WHERE idSucursal = @idSucursal;
+END;
 GO
---28/10 19:27 -> Valor $968 y $1008 en https://dolarito.ar
---Devuelve el valor del dolar en pesos
---DROP PROCEDURE Producto.PasajeDolarAPesos
---DECLARE @dolar DECIMAL(6,2); EXEC Producto.pasajeDolarAPesos @dolar OUTPUT; PRINT @dolar
+--	Procedimiento almacenado que permite eliminar una sucursal.
+--	DROP PROCEDURE Sucursal.eliminarSucursal
+CREATE OR ALTER PROCEDURE Sucursal.eliminarSucursal (@idSucursal INT)
+AS BEGIN
+	DECLARE @idDireccion INT;
+
+	SET @idDireccion = (SELECT idDireccion FROM Sucursal.Sucursal WHERE idSucursal = @idSucursal);
+
+	ALTER TABLE Sucursal.Sucursal
+		DROP CONSTRAINT FK_Sucursal_Direccion;
+	DELETE FROM Direccion.Direccion
+		WHERE idDireccion = @idDireccion;
+	ALTER TABLE Sucursal.Sucursal
+		ADD CONSTRAINT FK_Sucursal_Direccion FOREIGN KEY(idDireccion) REFERENCES Direccion.Direccion(idDireccion);
+
+	ALTER TABLE Empleado.Empleado
+		DROP CONSTRAINT FK_Empleado_Sucursal;
+	DELETE FROM Sucursal.Sucursal
+		WHERE idSucursal = @idSucursal;
+	ALTER TABLE Empleado.Empleado
+		ADD CONSTRAINT FK_Empleado_Sucursal FOREIGN KEY(idSucursal) REFERENCES Sucursal.Sucursal(idSucursal);	
+END
+GO
+--	Vista que permite ver la información de cada sucursal.
+--	DROP VIEW Sucursal.verDatosDeSucursales
+--	SELECT * FROM Sucursal.verDatosDeSucursales
+CREATE OR ALTER VIEW Sucursal.verDatosDeSucursales AS
+	SELECT s.idSucursal,s.horario,s.telefono,d.calle,d.numeroDeCalle,d.codigoPostal,d.localidad,d.provincia 
+		FROM Sucursal.Sucursal s JOIN Direccion.Direccion d
+		ON s.idDireccion = d.idDireccion;
+GO 
+--	Vista que permite ver a los empleados de cada sucursal
+--	DROP VIEW Sucursal.verEmpleadosDeCadaSucursal
+--	SELECT * FROM Sucursal.verEmpleadosDeCadaSucursal
+CREATE OR ALTER VIEW Sucursal.verEmpleadosDeCadaSucursal AS
+	SELECT s.idSucursal,e.legajo,e.cuil,e.apellido,e.nombre 
+		FROM Sucursal.Sucursal s JOIN Empleado.Empleado e
+		ON s.idSucursal = e.idSucursal;
+GO
+--Tabla Cargo
+--	Procedimiento almacenado que permite agregar un cargo
+--	DROP PROCEDURE Sucursal.agregarCargo
+CREATE OR ALTER PROCEDURE Sucursal.agregarCargo (@nombreCargo VARCHAR(255))
+AS BEGIN
+	IF EXISTS (SELECT 1 FROM Sucursal.Cargo 
+						WHERE nombreCargo = @nombreCargo COLLATE Modern_Spanish_CI_AI)
+	BEGIN
+		RAISERROR('Error en el procedimiento almacenado agregarCargo. el cargo ya se encuentra ingresado',16,3);
+		RETURN;
+	END
+
+	INSERT Sucursal.Cargo (nombreCargo) VALUES (@nombreCargo);
+END
+GO
+--	Procedimiento almacenado que permite modificar un cargo
+--	DROP PROCEDURE Sucursal.modificarCargo
+CREATE OR ALTER PROCEDURE Sucursal.modificarCargo (@idCargo INT,@nombreCargo VARCHAR(255))
+AS BEGIN
+	IF (LEN(LTRIM(RTRIM(@nombreCargo))) = 0)
+		RETURN;
+	UPDATE Sucursal.Cargo
+		SET nombreCargo = COALESCE(@nombreCargo,nombreCargo)
+		WHERE idCargo = @idCargo;
+END
+GO
+--	Procedimiento almacenado que permite eliminar un cargo
+--	DROP PROCEDURE Sucursal.eliminarCargo
+CREATE OR ALTER PROCEDURE Sucursal.eliminarCargo (@idCargo INT)
+AS BEGIN
+	ALTER TABLE Empleado.Empleado
+		DROP CONSTRAINT FK_Empleado_Cargo;
+
+	DELETE FROM Sucursal.Cargo
+		WHERE idCargo = @idCargo;
+
+	ALTER TABLE Empleado.Empleado
+		ADD CONSTRAINT FK_Empleado_Cargo FOREIGN KEY (idCargo) REFERENCES Sucursal.Cargo(idCargo);
+END
+GO
+--	Vista que permite ver el cargo que tiene cada empleado
+--	DROP VIEW Sucursal.verCargoDeEmpleados
+--	SELECT * FROM Sucursal.verCargoDeEmpleados
+CREATE OR ALTER VIEW Sucursal.verCargoDeEmpleados AS
+	SELECT e.legajo,e.cuil,e.apellido,e.nombre,c.nombreCargo 
+		FROM Empleado.Empleado e JOIN Sucursal.Cargo c
+		ON e.idCargo = c.idCargo;
+GO
+--Tabla Turno
+--	Procedimiento almacenado que permite agregar un turno
+--	DROP PROCEDURE Sucursal.agregarTurno
+CREATE OR ALTER PROCEDURE Sucursal.agregarTurno (@nombreTurno VARCHAR(255))
+AS BEGIN
+	IF EXISTS (SELECT 1 FROM Sucursal.Turno 
+					WHERE nombreTurno = @nombreTurno COLLATE Modern_Spanish_CI_AI)
+	BEGIN
+		RAISERROR('Error en el procedimiento almacenado agregarTurno.',16,4);
+		RETURN;
+	END
+
+	INSERT INTO Sucursal.Turno (nombreTurno) VALUES (@nombreTurno);
+END
+SELECT * FROM Sucursal.Turno
+GO
+--	Procedimiento almacenado que permite modificar un turno
+--	DROP PROCEDURE Sucursal.modificarTurno
+CREATE OR ALTER PROCEDURE Sucursal.modificarTurno (@idTurno INT, @nombreTurno VARCHAR(255) = NULL)
+AS BEGIN
+	IF (LEN(LTRIM(RTRIM(@nombreTurno))) = 0)
+		RETURN;
+
+	UPDATE Sucursal.Turno
+		SET nombreTurno = COALESCE(@nombreTurno,nombreTurno)
+		WHERE idTurno = @idTurno;
+END
+GO
+--	Procedimiento almacenado qeu permite eliminar un turno
+--	DROP PROCEDURE Sucursal.eliminarTurno
+CREATE OR ALTER PROCEDURE Sucursal.eliminarTurno (@idTurno INT)
+AS BEGIN
+	ALTER TABLE Empleado.Empleado
+		DROP CONSTRAINT FK_Empleado_Turno;
+
+	DELETE FROM Sucursal.Turno WHERE idTurno = @idTurno;
+
+	ALTER TABLE Empleado.Empleado
+		ADD CONSTRAINT FK_Empleado_Turno FOREIGN KEY (idTurno) REFERENCES Sucursal.Turno (idTurno);
+END
+GO
+--Vista que permite ver los turnos que tiene cada empleado.
+--DROP VIEW Sucursal.verTurnosDeEmpleados
+--SELECT * FROM Sucursal.verTurnosDeEmpleados
+CREATE OR ALTER VIEW Sucursal.verTurnosDeEmpleados AS
+	SELECT e.legajo,e.cuil,e.apellido,e.nombre,t.nombreTurno 
+			FROM Empleado.Empleado e JOIN Sucursal.Turno t
+			ON e.idTurno = t.idTurno;
+GO
+------------------------------------------------Producto------------------------------------------------
+--Tabla Producto
+--Procedimiento almacenado que permite agregar un producto
+--DROP PROCEDURE Sucursal.
+CREATE OR ALTER PROCEDURE Producto.agregarProducto (@idTipoDeProducto INT,@descripcionProducto VARCHAR(255),
+													@precioUnitario DECIMAL(10,2),@precioReferencia DECIMAL(10,2) = NULL,
+													@unidadReferencia VARCHAR(255) = NULL)
+AS BEGIN
+	print 'xd'
+END
+GO
+--Procedimiento almacenado que permite modificar producto
+--DROP PROCEDURE Producto.modificarProducto
+CREATE OR ALTER PROCEDURE Producto.modificarProducto
+AS BEGIN
+	print 'xd'
+END
+GO
+--Procedimiento almacenado que permite eliminar producto
+--DROP PROCEDURE Producto.eliminarProducto
+CREATE OR ALTER PROCEDURE Producto.eliminarProducto (@idProducto INT)
+AS BEGIN
+	ALTER TABLE Factura.DetalleFactura
+		DROP CONSTRAINT FK_DetalleFactura_Producto;
+
+	DELETE FROM Producto.Producto
+		WHERE idProducto = @idProducto;
+
+	ALTER TABLE Producto.DetalleFactura
+		ADD CONSTRAINT FK_DetalleFactura_Producto FOREIGN KEY (idProducto) 
+			REFERENCES Factura.DetalleFactura (idProducto);
+END
+GO
+--	Vista para ver los productos junto a su categoría
+--	DROP VIEW Producto.VerListadoDeProductos
+--	SELECT * FROM Producto.VerListadoDeProductos
+CREATE OR ALTER VIEW Producto.verListadoDeProductos AS
+	SELECT idProducto,precioUnitario,precioReferencia,unidadReferencia,t.nombreTipoDeProducto
+		FROM Producto.Producto p JOIN Producto.TipoDeProducto t ON p.idTipoDeProducto = t.idTipoDeProducto;
+GO
+--	Chequear en https://dolarito.ar
+--	Devuelve el valor del dolar en pesos
+--	DROP PROCEDURE Producto.PasajeDolarAPesos
+--	DECLARE @dolar DECIMAL(6,2); EXEC Producto.pasajeDolarAPesos @dolar OUTPUT; PRINT @dolar
 CREATE OR ALTER PROCEDURE Producto.pasajeDolarAPesos(@dolarPesificado DECIMAL(6,2) OUTPUT)
 AS
 BEGIN
@@ -305,145 +679,51 @@ BEGIN
 	SET NOCOUNT OFF;
 END
 GO
---Importar Catalogo CSV 
---DROP PROCEDURE Producto.importarCatalogoCSV
-/*
-DECLARE @rutaArchivo VARCHAR(MAX);
-SET @rutaArchivo = 'D:\unlam\BDDPlus\catalogo.csv'
-EXEC Producto.ImportarCatalogoCSV @rutaArchivo
-*/--
-CREATE OR ALTER PROCEDURE Producto.importarCatalogoCSV (@rutaArchivo varchar(MAX))
+--Tabla Tipo  de Producto
+--	Procedimiento almacenado para agregar una categoría de los productos
+--	DROP PROCEDURE Producto.AgregarTipoDeProducto;
+CREATE OR ALTER PROCEDURE Producto.agregarTipoDeProducto (@nombreTipoDeProducto VARCHAR(255))
 AS BEGIN
-	CREATE TABLE #Catalogo
-	(
-		Id VARCHAR(255),
-		Categoria VARCHAR(255),
-		Nombre VARCHAR(255),
-		Precio VARCHAR(255),
-		PrecioReferencia VARCHAR(255),
-		UnidadReferencia VARCHAR(255),
-		FechaHora VARCHAR(255)
-	);
-
-	CREATE TABLE #Catalogo2
-	(
-		Campo NVARCHAR(MAX)
-	);
-	DECLARE @SqlDinamico NVARCHAR(MAX); --Si es varchar(max) tira error
-	DECLARE @valorDelDolar DECIMAL(6,2);
-
-	BEGIN TRY
-		SET @SqlDinamico = 'BULK INSERT #Catalogo2
-						FROM '''+LTRIM(RTRIM(@rutaArchivo))+'''
-						WITH
-						(
-							FIELDTERMINATOR = ''0x0A'',
-							ROWTERMINATOR = ''0x0A'',
-							CODEPAGE=''1200'',
-							FIRSTROW = 2
-						);';
-		EXEC sp_executesql @SqlDinamico;
-	END TRY
-	BEGIN CATCH
-		RAISERROR ('Procedimiento importarCatalogoCSV Fallido. Error en la ruta ingresada.',16,1);
+	IF EXISTS (SELECT 1 FROM Producto.TipoDeProducto 
+				WHERE @nombreTipoDeProducto LIKE @nombreTipoDeProducto COLLATE Modern_Spanish_CI_AI)
+	BEGIN
+		RAISERROR('Error en el procedimiento almacenado "AgregarTipoDeProducto". La descripción ya se encuentra ingresada.',16,1);
 		RETURN;
-	END CATCH
-
-	UPDATE #Catalogo2 SET Campo = REPLACE(CAMPO,N'単','ñ')
-	SELECT * FROM #Catalogo2
-	SELECT * FROM #Catalogo
-	--SELECT *,LAST_VALUE(Nombre) OVER(ORDER BY Nombre) FROM #Catalogo 
-	--SELECT DISTINCT Categoria FROM #Catalogo
-	--EXEC Producto.PasajeDolarAPesos @valorDelDolar OUTPUT;
-
----TERMINAR
-	DROP TABLE #Catalogo2
-	DROP TABLE #Catalogo;
+	END
+	INSERT INTO Producto.TipoDeProducto(nombreTipoDeProducto) VALUES (@nombreTipoDeProducto);
 END
 GO
-------------------------------------------------Esquema Factura------------------------------------------------
---DROP VIEW Factura.verFactura
---SELECT * FROM Factura.verFactura
-CREATE OR ALTER VIEW Factura.verFactura AS
-	WITH FacturaFK AS
-	(
-		SELECT IDFactura,IDSucursal,IDMedioDePago
-			FROM Factura.Factura
-	),FacturaSucursal (IDFactura,IDMedioDePago,Sucursal) AS
-	(
-		SELECT IDFactura,IDMedioDePago,d.Localidad
-			FROM 
-			(
-				SELECT IDFactura,IDMedioDepago,IDDireccion 
-					FROM FacturaFK f JOIN Sucursal.Sucursal s ON f.IDSucursal = s.IDSucursal
-			) AS T JOIN Direccion.Direccion d ON T.IDDireccion = d.IDDireccion
-	),FacturaMedioDePago (IDFactura,[Medio De Pago],Sucursal) AS
-	(
-		SELECT IDFactura,m.Descripcion,Sucursal
-			FROM FacturaSucursal s JOIN Factura.MedioDePago m ON s.IDMedioDePago = m.IDMedioDePago
-	),FacturaDetalle AS
-	(
-		SELECT mp.IDFactura,IDDetalleFactura,[Medio De Pago],Sucursal,IDProducto,Cantidad
-			FROM FacturaMedioDePago mp JOIN Factura.DetalleFactura d ON mp.IDFactura = d.IDFactura
-	),FacturaResumen (IDFactura,IDDetalleFactura,NombreProd,[Medio De Pago],Sucursal,Cantidad,PrecioReferencia,UnidadReferencia) AS
-	(
-		SELECT IDFactura,IDDetalleFactura,p.Descripcion,[Medio De Pago],Sucursal,
-				Cantidad,PrecioReferencia,UnidadReferencia
-			FROM FacturaDetalle d JOIN Producto.Producto p ON d.IDProducto = p.IDProducto
-	),FacturaPrecioTotal AS
-	(
-		SELECT r.IDFactura,r.IDDetalleFactura,f.TipoFactura,f.TipoCliente,
-					r.NombreProd,r.PrecioReferencia,r.Cantidad,r.PrecioReferencia*r.Cantidad  AS Total,
-					f.FechaHora,r.[Medio De Pago],f.LegajoEmpleado,r.Sucursal
-			FROM FacturaResumen r  JOIN Factura.Factura f ON r.IDFactura = f.IDFactura
-	)SELECT IDFactura,IDDetalleFactura,TipoFactura,TipoCliente,
-			NombreProd,PrecioReferencia AS Precio,Cantidad,SUM(TOTAL) OVER (PARTITION BY IDFactura,IDDetalleFactura) AS TOTAL,
-			FechaHora,[Medio De Pago],LegajoEmpleado AS Empleado,Sucursal
-		FROM FacturaPrecioTotal
-GO
-------------------------------------------------Esquema Dirección------------------------------------------------
-
---DROP FUNCTION Direccion.cantidadDeHabitantesEnDireccion
---DECLARE num INT;PRINT Direccion.cantidadDeHabitantesEnDireccion (@num)
-CREATE OR ALTER FUNCTION Direccion.cantidadDeHabitantesEnDireccion (@IDDireccion INT)
-RETURNS INT
+--	Procedimiento almacenado para modificar el nombre de la categoría
+--	DROP PROCEDURE Producto.modificarTipoDeProducto
+CREATE OR ALTER PROCEDURE Producto.modificarTipoDeProducto (@idTipoDeProducto INT,@nombreTipoDeProducto VARCHAR(255))
 AS BEGIN
-		SELECT * FROM sys.all_columns
-	RETURN 1;
+	IF NOT EXISTS (SELECT 1 FROM Producto.TipoDeProducto WHERE idTipoDeProducto = @idTipoDeProducto)
+		RETURN;
+	IF (@nombreTipoDeProducto IS NULL OR LEN(LTRIM(RTRIM(@nombreTipoDeProducto))) = 0)
+		RETURN;
+	UPDATE Producto.TipoDeProducto 
+		SET nombreTipoDeProducto = @nombreTipoDeProducto 
+		WHERE idTipoDeProducto = @idTipoDeProducto;
 END
 GO
-------------------------------------------------Empleado------------------------------------------------
-------------------------------------------------Empleado------------------------------------------------
-CREATE TABLE TablaUno
-(
-	ID INT,
-	CONSTRAINT PK_TablaUno PRIMARY KEY(ID)
-)
+--	Procedimienot almacenado para eliminar un tipo de categoría de los productos.
+--	DROP PROCEDURE Producto.eliminarTipoDeProducto
+CREATE OR ALTER PROCEDURE Producto.eliminarTipoDeProducto (@idTipoDeProducto INT)
+AS BEGIN
+	IF NOT EXISTS (SELECT 1 FROM Producto.TipoDeProducto WHERE idTipoDeProducto = @idTipoDeProducto)
+		RETURN;
 
-CREATE TABLE TablaDos
-(
-	Cod INT,
-	IDUno INT,
-	CONSTRAINT PK_TablaDos PRIMARY KEY(Cod),
-	CONSTRAINT FK_TablaDosUno FOREIGN KEY(IDUno) REFERENCES TablaUno(ID)
-)
-INSERT INTO TablaUno VALUES (9)
-INSERT INTO TablaDos VALUES (1,9)
+	UPDATE Producto.Producto
+		SET idTipoDeProducto = NULL
+		WHERE idTipoDeProducto = @idTipoDeProducto;
 
-ALTER TABLE TablaDos
-	DROP CONSTRAINT FK_TablaDosUno
-ALTER TABLE TablaUno
-	DROP CONSTRAINT PK_TablaUno
+	ALTER TABLE Producto.TipoDeProducto
+		DROP CONSTRAINT PK_TipoDeProducto
 
-UPDATE TablaDos SET IDUno=NULL WHERE IDUno=9
-DELETE FROM TablaUno WHERE ID=9;
-ALTER TABLE TablaUno
-	ADD CONSTRAINT PK_TablaUno PRIMARY KEY(ID)
-ALTER TABLE TablaDos
-	ADD CONSTRAINT FK_TablaDosUno Foreign KEY(IDUno) REFERENCES TABLAUNO(ID)
+	DELETE FROM Producto.TipoDeProducto
+		WHERE idTipoDeProducto = @idTipoDeProducto;
 
-	SELECT * FROM TablaUno
-	SELECT * FROM TablaDos
-
-DROP TABLE TablaUno
-DROP TABLE TablaDos
+	ALTER TABLE Producto.TipoDeProducto
+		ADD CONSTRAINT PK_TipoDeProducto PRIMARY KEY(idTipoDeProducto);
+END
+GO
