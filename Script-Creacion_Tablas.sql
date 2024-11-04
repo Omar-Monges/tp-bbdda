@@ -1,10 +1,10 @@
 ------------------------------------------------Creacion DB------------------------------------------------
-IF NOT EXISTS (SELECT * FROM sys.databases WHERE name = 'G2900G19')
-	CREATE DATABASE G2900G19 COLLATE Modern_Spanish_CI_AS;
---USE master;
---IF EXISTS (SELECT * FROM sys.databases WHERE name = 'G2900G19') DROP DATABASE G2900G19;
+IF NOT EXISTS (SELECT * FROM sys.databases WHERE name = 'Com2900G19')
+	CREATE DATABASE Com2900G19 COLLATE Modern_Spanish_CI_AS;
+-- USE master;
+--IF EXISTS (SELECT * FROM sys.databases WHERE name = 'Com2900G19') DROP DATABASE Com2900G19;
 GO
-USE G2900G19;
+USE Com2900G19;
 GO
 ------------------------------------------------Esquemas------------------------------------------------
 --Esquema Direccion
@@ -39,13 +39,13 @@ BEGIN
 		numeroDeCalle SMALLINT NOT NULL,--short en C
 		piso TINYINT NULL, --unsigned char en C
 		departamento TINYINT NULL,
-		codigoPostal SMALLINT NOT NULL,
-		localidad VARCHAR(255) NOT NULL,
-		provincia VARCHAR(255) NOT NULL,
-		CONSTRAINT PK_DIRECCION PRIMARY KEY(IDDireccion),
+		codigoPostal VARCHAR(10) NOT NULL,
+		localidad VARCHAR(50) NOT NULL,
+		provincia VARCHAR(50) NOT NULL,
+		CONSTRAINT PK_Direccion PRIMARY KEY(IDDireccion),
 		CONSTRAINT CK_Direccion_NumeroDeCalle CHECK(numeroDeCalle >= 0),
-		CONSTRAINT CK_Direccion_Piso CHECK(piso >= 0),
-		CONSTRAINT CK_Direccion_CodigoPostal CHECK(codigoPostal >= 0),
+		CONSTRAINT CK_Empleado_Edificio CHECK((piso IS NULL AND departamento IS NULL) OR 
+											(piso IS NOT NULL AND departamento IS NOT NULL))
 	)--CK = Check
 END;
 GO
@@ -58,7 +58,7 @@ BEGIN
 		idSucursal INT IDENTITY(1,1),
 		telefono VARCHAR(9) NOT NULL,
 		idDireccion INT,
-		horario VARCHAR(255) NOT NULL,
+		horario VARCHAR(100) NOT NULL,
 		CONSTRAINT PK_Sucursal PRIMARY KEY(idSucursal),
 		CONSTRAINT FK_Sucursal_Direccion FOREIGN KEY(IDDireccion) REFERENCES Direccion.Direccion(idDireccion),
 		CONSTRAINT CK_Sucursal_Telefono CHECK(telefono LIKE '[0-9][0-9][0-9][0-9]-[0-9][0-9][0-9][0-9]')
@@ -71,7 +71,7 @@ BEGIN
 	CREATE TABLE Sucursal.Turno
 	(
 		idTurno INT IDENTITY(1,1),
-		nombreTurno VARCHAR(255) NOT NULL,
+		nombreTurno VARCHAR(50) NOT NULL,
 		CONSTRAINT PK_Turno PRIMARY KEY(idTurno)
 	)
 END;
@@ -93,13 +93,13 @@ IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'Emple
 BEGIN
 	CREATE TABLE Empleado.Empleado
 	(
-		legajo INT IDENTITY(1,1),
+		legajo INT IDENTITY(257020,1),
 		dni VARCHAR(8) NOT NULL,
 		cuil VARCHAR(13) NOT NULL,
 		nombre VARCHAR(50) NOT NULL,
 		apellido VARCHAR(50) NOT NULL,
-		emailPersonal VARCHAR(50) NOT NULL,
-		emailEmpresarial VARCHAR(50) NOT NULL,
+		emailPersonal VARCHAR(100) NULL,
+		emailEmpresarial VARCHAR(100) NOT NULL,
 		idDireccion INT,
 		idSucursal INT,
 		idTurno INT,
@@ -112,7 +112,7 @@ BEGIN
 		CONSTRAINT CK_Empleado_DNI CHECK(dni LIKE '[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]'),
 		CONSTRAINT CK_Empleado_CUIL CHECK(cuil LIKE '[0-9][0-9]-[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]-[0-9]'),
 		CONSTRAINT CK_Empleado_EmailPersonal CHECK(emailPersonal like '%@%.com'),
-		CONSTRAINT CK_Empleado_EmailEmpresarial CHECK(emailEmpresarial LIKE '%@aurora.com')
+		CONSTRAINT CK_Empleado_EmailEmpresarial CHECK(emailEmpresarial LIKE '%@superA.com')
 	)
 END;
 GO
@@ -123,7 +123,7 @@ BEGIN
 	CREATE TABLE Producto.TipoDeProducto
 	(
 		idTipoDeProducto INT IDENTITY(1,1),
-		nombreTipoDeProducto VARCHAR(255) NOT NULL,
+		nombreTipoDeProducto VARCHAR(50) NOT NULL,
 		CONSTRAINT PK_TipoDeProducto PRIMARY KEY(idTipoDeProducto)
 	)
 END;
@@ -135,14 +135,16 @@ BEGIN
 	(
 		idProducto INT IDENTITY(1,1),
 		idTipoDeProducto INT,
-		descripcionProducto VARCHAR(255) NOT NULL,
+		descripcionProducto VARCHAR(150) NOT NULL,
 		precioUnitario DECIMAL(10,2)  NOT NULL,
 		precioReferencia DECIMAL(10,2)  NULL,
-		unidadReferencia VARCHAR(255) NULL,
+		unidadReferencia VARCHAR(10) NULL,
 		CONSTRAINT PK_Producto PRIMARY KEY(idProducto),
 		CONSTRAINT FK_Producto_TipoDeProducto FOREIGN KEY(idTipoDeProducto) REFERENCES Producto.TipoDeProducto(idTipoDeProducto),
 		CONSTRAINT CK_Producto_PrecioUnitario CHECK(precioUnitario >= 0),
-		CONSTRAINT CK_Producto_PrecioReferencia CHECK(precioReferencia >= 0)
+		CONSTRAINT CK_Producto_PrecioReferencia CHECK(precioReferencia >= 0),
+		CONSTRAINT CK_Producto_Referencia CHECK((precioReferencia IS NOT NULL AND unidadReferencia IS NOT NULL) OR 
+												(precioReferencia IS NULL AND unidadReferencia IS NULL))
 	)
 END;
 GO
@@ -153,7 +155,8 @@ BEGIN
 	CREATE TABLE Factura.MedioDePago
 	(
 		idMedioDePago INT IDENTITY(1,1),
-		nombreMedioDePago VARCHAR(255) NOT NULL,
+		nombreMedioDePago VARCHAR(50) NOT NULL,
+		descripcion VARCHAR(50) NULL,
 		CONSTRAINT PK_MedioDePago PRIMARY KEY(idMedioDePago)
 	);
 END;
@@ -171,14 +174,15 @@ BEGIN
 		idMedioDepago INT,
 		legajo INT,
 		idSucursal INT,
-		identificadorDePago VARCHAR(22) NULL,
+		identificadorDePago INT NULL,
 		CONSTRAINT PK_Factura PRIMARY KEY(idFactura),
 		CONSTRAINT FK_Factura_MedioDePago FOREIGN KEY(idMedioDePago) REFERENCES Factura.MedioDePago(idMedioDePago),
 		CONSTRAINT FK_Factura_LegajoEmpleado FOREIGN KEY(legajo) REFERENCES Empleado.Empleado(legajo),
 		CONSTRAINT FK_Factura_Sucursal FOREIGN KEY(idSucursal) REFERENCES Sucursal.Sucursal(idSucursal),
 		CONSTRAINT CK_Factura_TipoFactura CHECK(tipoFactura IN ('A', 'B', 'C')),
 		CONSTRAINT CK_Factura_TipoCliente CHECK(tipoCliente IN('Normal', 'Member')), 
-		CONSTRAINT CK_Factura_Genero CHECK(genero IN('Male', 'Female'))
+		CONSTRAINT CK_Factura_Genero CHECK(genero IN('Male', 'Female')),
+--		CONSTRAINT CK_Factura_IdentificadorDepago CHECK() <-- ¿Solo aceptan 3 tipos de pago? Efectivo,tarjeta y ewallet
 	)
 END;
 GO
