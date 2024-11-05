@@ -79,7 +79,6 @@ CREATE OR ALTER VIEW Direccion.verDireccionesDeSucursales AS
 	SELECT s.idSucursal,d.calle,d.numeroDeCalle,d.codigoPostal,d.localidad,d.provincia
 		FROM Sucursal.Sucursal s JOIN Direccion.Direccion d ON d.idDireccion = s.idDireccion;
 GO
-
 --Obtener un codigo Postal mediante una API
 --https://api.zippopotam.us/ar/buenos%20aires/laferrere
 --https://www.geonames.org/postalcode-search.html?q=san+isidro&country=AR
@@ -810,7 +809,7 @@ GO
 CREATE OR ALTER PROCEDURE Producto.agregarTipoDeProducto (@nombreTipoDeProducto VARCHAR(255))
 AS BEGIN
 	IF EXISTS (SELECT 1 FROM Producto.TipoDeProducto 
-				WHERE @nombreTipoDeProducto LIKE @nombreTipoDeProducto)
+				WHERE nombreTipoDeProducto LIKE @nombreTipoDeProducto)
 	BEGIN
 		RAISERROR('Error en el procedimiento almacenado "AgregarTipoDeProducto". La categoría ya se encuentra ingresada.',16,1);
 		RETURN;
@@ -847,4 +846,21 @@ AS BEGIN
 	DELETE FROM Producto.TipoDeProducto
 		WHERE idTipoDeProducto = @idTipoDeProducto;
 END;
+GO
+------------------------------------------------Factura------------------------------------------------
+--		DROP PROCEDURE Factura.agregarFactura
+CREATE OR ALTER PROCEDURE Factura.agregarFactura(@tipoFactura CHAR, @tipoCliente VARCHAR(10), @genero VARCHAR(10),
+												@fechaHora SMALLDATETIME, @idMedioDePago INT, @legajo INT,
+												@idSucursal INT, @idDePago INT,@idProducto INT,@cantidad SMALLINT)
+AS BEGIN
+	IF(LEN(LTRIM(@tipoCliente)) = 0 OR LEN(LTRIM(@genero)) = 0)
+	BEGIN
+		RAISERROR('Error en el procedimiento almacenado agregarFactura.',16,14);
+		RETURN;
+	END
+
+	INSERT INTO Factura.Factura (tipoFactura,tipoCliente,genero,fechaHora,idMedioDepago,legajo,idSucursal,identificadorDePago,idProducto,cantidad)
+		VALUES (@tipoFactura,@tipoCLiente,@genero,@fechaHora,@idMedioDePago,@legajo,@idSucursal,@idDePago,@idProducto,@cantidad);
+
+END
 GO

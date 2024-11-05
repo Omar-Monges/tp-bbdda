@@ -203,7 +203,7 @@ EXEC Empleado.agregarEmpleado '39231254','Oscar Martín','Ortiz','M','Oscar Martí
 EXEC Empleado.agregarEmpleado '30766254','Débora','Pachtman','F','Débora_PACHTMAN@gmail.com','Débora.PACHTMAN@superA.com',3,3,3,'Av. Presidente Hipólito Yrigoyen',299,NULL,'Provincia de Buenos Aires','Buenos Aires',NULL,NULL;
 EXEC Empleado.agregarEmpleado '38974125','Romina Natalia','Padilla','F','Romina Natalia_PADILLA@gmail.com','Romina Natalia.PADILLA@superA.com',1,3,3,'Lacroze',5910,NULL,'Chilavert','Buenos Aires',NULL,NULL;
 GO
-SELECT * FROM Empleado.Empleado
+--		SELECT * FROM Empleado.Empleado
 /*
 EXEC Empleado.ArchComplementario_importarEmpleado 'C:\Users\joela\Downloads\TP_integrador_Archivos\TP_integrador_Archivos\Informacion_complementaria.xlsx';
 */
@@ -350,7 +350,18 @@ AS BEGIN
 	DECLARE @i INT = 1,
 			@ultFila INT;
 	DECLARE @valorDelDolar DECIMAL(6,2);
-	DECLARE @SqlDinamico NVARCHAR(MAX);
+	DECLARE @SqlDinamico NVARCHAR(MAX),
+			@categoria NVARCHAR(MAX),
+			@nombreProducto NVARCHAR(MAX),
+			@precio NVARCHAR(MAX),
+			@precioReferencia NVARCHAR(MAX),
+			@unidadReferencia NVARCHAR(MAX),
+			@parteUno NVARCHAR(MAX),
+			@parteDos NVARCHAR(MAX),
+			@parteTres NVARCHAR(MAX);
+	DECLARE @precioDecimalUni DECIMAL(15,2),
+			@precioDecimalRef DECIMAL(15,2);
+
 	CREATE TABLE #Catalogo
 	(
 		id INT identity(1,1),
@@ -390,20 +401,13 @@ AS BEGIN
 
 	INSERT #campoConComillas (parteDos,parteUno,parteTres)
 			SELECT SUBSTRING(campo, CHARINDEX('"',campo,1) + 1, CHARINDEX('"',SUBSTRING(campo,CHARINDEX('"',campo,1) + 1,LEN(campo)),1) - 1) AS parteDos,
-				LEFT(campo,CHARINDEX(SUBSTRING(campo, CHARINDEX('"',campo,1) + 1, CHARINDEX('"',SUBSTRING(campo,CHARINDEX('"',campo,1) + 1,LEN(campo)),1) - 1),campo,1) - 3) AS parteUno,
-				SUBSTRING(campo, CHARINDEX('",',campo,1) + 2,LEN(campo))  AS parteTres
+					LEFT(campo,CHARINDEX(SUBSTRING(campo, CHARINDEX('"',campo,1) + 1, CHARINDEX('"',SUBSTRING(campo,CHARINDEX('"',campo,1) + 1,LEN(campo)),1) - 1),campo,1) - 3) AS parteUno,
+					SUBSTRING(campo, CHARINDEX('",',campo,1) + 2,LEN(campo))  AS parteTres
 				FROM #aux
 				WHERE CHARINDEX('"',campo,1) > 0;
 
 	SET @ultFila = (SELECT TOP(1) fila FROM #campoConComillas ORDER BY fila DESC);
-	DECLARE @categoria NVARCHAR(MAX),
-			@nombreProducto NVARCHAR(MAX),
-			@precio NVARCHAR(MAX),
-			@precioReferencia NVARCHAR(MAX),
-			@unidadReferencia NVARCHAR(MAX),
-			@parteUno NVARCHAR(MAX),
-			@parteDos NVARCHAR(MAX),
-			@parteTres NVARCHAR(MAX);
+	
 
 	WHILE (@i <= @ultFila)
 	BEGIN
@@ -468,6 +472,10 @@ AS BEGIN
 
 	EXEC Producto.pasajeDolarAPesos @valorDelDolar OUTPUT;
 
+	update #Catalogo
+		SET Nombre = REPLACE(Nombre,'Ãº','ú')
+		WHERE Nombre LIKE '%Ãº%';
+
 	INSERT INTO Producto.TipoDeProducto (nombreTipoDeProducto)
 		SELECT DISTINCT Categoria FROM #Catalogo;
 
@@ -475,14 +483,16 @@ AS BEGIN
 	SET @ultFila = (SELECT TOP(1) filas FROM (SELECT ROW_NUMBER() OVER (ORDER BY id) AS filas FROM #Catalogo) AS T ORDER BY filas DESC);
 	WHILE (@i <= @ultFila)
 	BEGIN
-		SELECT @categoria = Categoria,@nombreProducto = Nombre, @precio = Precio, @precioReferencia = PrecioReferencia, @unidadReferencia = UnidadReferencia 
+		SELECT @categoria = Categoria,@nombreProducto = Nombre, @precioDecimalUni = Precio, @precioDecimalRef = PrecioReferencia, @unidadReferencia = UnidadReferencia 
 			FROM 
 				(
 					SELECT Categoria,Nombre,Precio,PrecioReferencia,UnidadReferencia,ROW_NUMBER() OVER (ORDER BY id) AS filas FROM #Catalogo
 				) AS T 
 			WHERE filas = @i;
+		SET @precioDecimalUni = @precioDecimalUni * @valorDelDolar;
+		SET @precioDecimalRef = @precioDecimalRef * @valorDelDolar;
 
-		EXEC Producto.agregarProductoConNombreTipoProd @categoria,@nombreProducto,@precio,@precioReferencia,@unidadReferencia
+		EXEC Producto.agregarProductoConNombreTipoProd @categoria,@nombreProducto,@precioDecimalUni,@precioDecimalRef,@unidadReferencia;
 
 		SET @i = @i + 1;
 	END
@@ -495,3 +505,206 @@ END;
 GO
 EXEC Producto.importarCatalogoCSV 'C:\Users\joela\Downloads\TP_integrador_Archivos\TP_integrador_Archivos\Productos\catalogo.csv'
 GO
+-----------------------------------------
+--DROP PROCEDURE Producto.importarProductosElectronicosXLSX
+CREATE OR ALTER PROCEDURE Producto.importarProductosElectronicosXLSX (@ruta NVARCHAR(MAX))
+AS BEGIN
+	DECLARE @idTipoDeProducto INT;
+	DECLARE @SqlDinamico NVARCHAR(MAX);
+	DECLARE @DolarEnPesos DECIMAL(6,2);
+
+	CREATE TABLE #aux
+	(
+		nombre VARCHAR(MAX),
+		precio DECIMAL(10,2)
+	)
+
+	SET @SqlDinamico = 'INSERT #aux';
+
+	SET @SqlDinamico = @SqlDinamico + ' SELECT *
+										FROM OPENROWSET(''Microsoft.ACE.OLEDB.16.0'', 
+														''Excel 12.0; Database='+ @ruta +'; HDR=YES'', 
+														''SELECT * FROM [sheet1$]'')';
+	EXECUTE sp_executesql @SqlDinamico;
+
+	EXEC Producto.pasajeDolarAPesos @DolarEnPesos OUTPUT;
+
+	EXEC Producto.agregarTipoDeProducto 'Electronica';
+	
+	SET @idTipoDeProducto = (SELECT TOP(1) idTipoDeProducto FROM Producto.TipoDeProducto 
+								ORDER BY idTipoDeProducto DESC);
+
+	INSERT INTO Producto.Producto (descripcionProducto,idTipoDeProducto,precioUnitario,precioReferencia,unidadReferencia)
+		SELECT nombre, @idTipoDeProducto, precio * @DolarEnPesos, precio  * @DolarEnPesos, 'ud' FROM #aux
+
+	DROP TABLE #aux;
+END;
+GO
+EXEC Producto.importarProductosElectronicosXLSX 'C:\Users\joela\Downloads\TP_integrador_Archivos\TP_integrador_Archivos\Productos\Electronic_accessories.xlsx'
+GO
+-------------------------------------------------
+CREATE OR ALTER PROCEDURE Producto.importarProductosImportadosXLSX (@rutaArch VARCHAR(MAX))
+AS BEGIN
+	
+	DECLARE @SqlDinamico NVARCHAR(MAX);
+
+	DECLARE @DolarEnPesos DECIMAL(6,2);
+
+	CREATE TABLE #aux
+	(
+		nombre VARCHAR(MAX),
+		categoria varchar(max),
+		precio DECIMAL(10,2),
+		precioRef DECIMAL(10,2),
+		unidadRef VARCHAR(MAX)
+	)
+
+	SET @SqlDinamico = 'INSERT #aux (nombre,categoria,precio)';
+	SET @SqlDinamico = @SqlDinamico + ' SELECT NombreProducto,[Categoría],PrecioUnidad
+										FROM OPENROWSET(''Microsoft.ACE.OLEDB.16.0'', 
+														''Excel 12.0; Database='+ @rutaArch +'; HDR=YES'', 
+														''SELECT * FROM [Listado de Productos$]'')';
+	EXECUTE sp_executesql @SqlDinamico;
+
+	INSERT INTO Producto.TipoDeProducto (nombreTipoDeProducto)
+		SELECT DISTINCT categoria FROM #aux
+
+	UPDATE #aux
+		SET precioRef = precio,
+			unidadRef = 'ud'
+
+	EXEC Producto.pasajeDolarAPesos @DolarEnPesos OUTPUT;
+
+	INSERT INTO Producto.Producto (descripcionProducto,precioUnitario,precioReferencia,unidadReferencia,idTipoDeProducto)
+		SELECT nombre,precio * @DolarEnPesos,precioRef  * @DolarEnPesos,unidadRef, t.idTipoDeProducto
+			FROM #aux a JOIN Producto.TipoDeProducto t
+				ON a.categoria like t.nombreTipoDeProducto COLLATE Modern_Spanish_CI_AS;
+
+	DROP TABLE #aux;
+END
+GO
+EXEC Producto.importarProductosImportadosXLSX 'C:\Users\joela\Downloads\TP_integrador_Archivos\TP_integrador_Archivos\Productos\Productos_importados.xlsx'
+GO
+-------------------------------------------------
+--DROP PROCEDURE Factura.agregarFacturas
+CREATE OR ALTER PROCEDURE Factura.agregarFacturas (@rutaArch NVARCHAR(MAX))
+AS
+BEGIN
+    DECLARE @SqlDinamico NVARCHAR(MAX);
+    
+    CREATE TABLE #aux (
+        idFactura NVARCHAR(MAX),
+        tipoFactura NVARCHAR(MAX),
+        ciudad NVARCHAR(MAX),
+        tipoCliente NVARCHAR(MAX),
+        genero NVARCHAR(MAX),
+        producto NVARCHAR(MAX),
+        preciounitario NVARCHAR(MAX),
+        cantidad NVARCHAR(MAX),
+        fecha NVARCHAR(MAX),
+        hora NVARCHAR(MAX),
+        medioDePago NVARCHAR(MAX),
+        empleado NVARCHAR(MAX),
+        idDePago NVARCHAR(MAX)
+    );
+    
+    SET @SqlDinamico = N'BULK INSERT #aux
+        FROM ''' + @rutaArch + '''
+        WITH (
+		 DATAFILETYPE = ''widechar'', 
+            FIELDTERMINATOR = '';'', 
+            CODEPAGE = ''65001'', 
+            FIRSTROW = 2
+        );';
+    EXEC sp_executesql @SqlDinamico;
+	--drop table #aux;end;
+
+    UPDATE #aux 
+		SET producto = REPLACE(producto, 'Ã¡', 'a');		
+    UPDATE #aux 
+		SET producto = REPLACE(producto, 'Ã©', 'e');
+    UPDATE #aux 
+		SET producto = REPLACE(producto, 'Ã­', 'i');
+    UPDATE #aux 
+		SET producto = REPLACE(producto, 'Ã³', 'o');
+    UPDATE #aux 
+		SET producto = REPLACE(REPLACE(producto, 'ÃƒÂº', 'u'),'Ãº','u');
+    UPDATE #aux 
+		SET producto = REPLACE(REPLACE(producto, 'Ã±', 'ñ'),'å˜','ñ');
+	UPDATE #aux
+		SET idDePago = SUBSTRING(idDePago,2,LEN(idDePago))
+		WHERE CHARINDEX('-',idDePago,1) = 0;
+	--select * from 
+
+	UPDATE #aux
+		SET ciudad = 'San Justo'
+		WHERE ciudad LIKE 'Yangon'
+	UPDATE #aux
+		SET ciudad = 'Ramos Mejia'
+		WHERE ciudad LIKE 'Naypyitaw'
+	UPDATE #aux
+		SET ciudad = 'Lomas del Mirador'
+		WHERE ciudad LIKE 'Mandalay';
+
+	--select COUNT(id) from #aux;
+	WITH ProductosInexistentesCTE AS
+	(
+		SELECT * FROM #aux a 
+			WHERE NOT EXISTS (
+								SELECT 1 FROM Producto.Producto p
+									WHERE p.descripcionProducto = a.producto COLLATE Modern_Spanish_CI_AI
+							)
+	)
+	DELETE FROM ProductosInexistentesCTE;
+	--SELECT * FROM Factura.Factura;
+
+	WITH FacturaCTE AS 
+	(
+		SELECT idFactura AS id,medioDePago,producto,ciudad FROM #aux
+	),SucursalCTE AS
+	(
+		SELECT id,medioDePago,producto,d.idSucursal 
+			FROM FacturaCTE f JOIN Direccion.verDireccionesDeSucursales d
+				ON f.ciudad LIKE d.localidad COLLATE Modern_Spanish_CI_AI
+	), NombreProductoCTE (idFactura,medioDePago,idProducto,idSucursal) AS
+	(
+		SELECT f.id,f.medioDePago,p.idProducto,f.idSucursal 
+			FROM SucursalCTE f JOIN Producto.Producto p
+				ON f.producto LIKE p.descripcionProducto COLLATE Modern_Spanish_CI_AI
+	), NombreMedioDePagoCTE AS
+	(
+		SELECT p.idFactura,p.idProducto,m.idMedioDePago,p.idSucursal
+			FROM NombreProductoCTE p JOIN Factura.MedioDePago m
+				ON p.medioDePago LIKE m.nombreMedioDePago COLLATE Modern_Spanish_CI_AI
+	),FacturaAInsertarCTE AS
+	(
+		SELECT  tipoFactura,tipoCliente,genero,CAST(cantidad as smallint) as cantidad,CONVERT(smalldatetime,fecha) + CONVERT(smalldatetime,hora) AS Fecha,n.idProducto,n.idMedioDePago,empleado,idSucursal,idDePago
+			FROM NombreMedioDePagoCTE n JOIN (
+												SELECT idFactura,tipoFactura,
+														tipoCliente,genero,cantidad,fecha,hora,empleado,idDePago FROM #aux
+											) AS a
+				ON n.idFactura LIKE a.idFactura
+	)
+	INSERT INTO Factura.Factura (tipoFactura,tipoCliente,genero,cantidad,fechaHora,idProducto,idMedioDepago,legajo,idSucursal,identificadorDePago)
+		SELECT * FROM FacturaAInsertarCTE
+	--SELECT *  FROM FacturaAInsertarCTE
+--	(tipoFactura,tipoCliente,genero,cantidad,fechaHora,idProducto,idMedioDepago,legajo,idSucursal,identificadorDePago)
+
+	--		SELECT * FROM Factura.MedioDePago
+	/*
+	INSERT INTO Factura.Factura (tipoFactura,tipoCliente,genero,cantidad,fechaHora,idProducto,idMedioDepago,legajo,idSucursal,identificadorDePago)
+		SELECT  a.tipoFactura,a.tipoCliente,a.genero,a.cantidad,a.fecha,p.idProducto,a.idDePago
+			FROM #aux a JOIN Producto.Producto p
+				ON a.producto = p.descripcionProducto COLLATE Modern_SPanish_CI_AI;
+				*/
+	--select COUNT(id) from #aux;
+   -- SELECT * FROM #aux;
+
+    DROP TABLE #aux;
+END;
+GO
+EXEC Factura.agregarFacturas 'C:\Users\joela\Downloads\TP_integrador_Archivos\TP_integrador_Archivos\Ventas_registradas.csv'
+GO
+SELECT COUNT(descripcionProducto),* FROM Producto.Producto 
+
+SELECT * FROM Factura.Factura

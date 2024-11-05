@@ -136,8 +136,8 @@ BEGIN
 		idProducto INT IDENTITY(1,1),
 		idTipoDeProducto INT,
 		descripcionProducto VARCHAR(150) NOT NULL,
-		precioUnitario DECIMAL(10,2)  NOT NULL,
-		precioReferencia DECIMAL(10,2)  NULL,
+		precioUnitario DECIMAL(15,2)  NOT NULL,
+		precioReferencia DECIMAL(15,2)  NULL,
 		unidadReferencia VARCHAR(10) NULL,
 		CONSTRAINT PK_Producto PRIMARY KEY(idProducto),
 		CONSTRAINT FK_Producto_TipoDeProducto FOREIGN KEY(idTipoDeProducto) REFERENCES Producto.TipoDeProducto(idTipoDeProducto),
@@ -166,15 +166,17 @@ IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'Factu
 BEGIN
 	CREATE TABLE Factura.Factura
 	(
-		idFactura INT,
+		idFactura INT IDENTITY(1,1),
 		tipoFactura CHAR NOT NULL,
 		tipoCliente VARCHAR(10) NOT NULL,
 		genero VARCHAR(10) NOT NULL,
+		cantidad SMALLINT NOT NULL,
 		fechaHora SMALLDATETIME NOT NULL,
+		idProducto INT,
 		idMedioDepago INT,
 		legajo INT,
 		idSucursal INT,
-		identificadorDePago INT NULL,
+		identificadorDePago VARCHAR(23) NOT NULL,
 		CONSTRAINT PK_Factura PRIMARY KEY(idFactura),
 		CONSTRAINT FK_Factura_MedioDePago FOREIGN KEY(idMedioDePago) REFERENCES Factura.MedioDePago(idMedioDePago),
 		CONSTRAINT FK_Factura_LegajoEmpleado FOREIGN KEY(legajo) REFERENCES Empleado.Empleado(legajo),
@@ -182,23 +184,9 @@ BEGIN
 		CONSTRAINT CK_Factura_TipoFactura CHECK(tipoFactura IN ('A', 'B', 'C')),
 		CONSTRAINT CK_Factura_TipoCliente CHECK(tipoCliente IN('Normal', 'Member')), 
 		CONSTRAINT CK_Factura_Genero CHECK(genero IN('Male', 'Female')),
+		CONSTRAINT FK_Factura_Producto FOREIGN KEY(idProducto) REFERENCES Producto.Producto(idProducto),
+		CONSTRAINT CK_Factura_CantidadProductos CHECK(cantidad > 0)
 --		CONSTRAINT CK_Factura_IdentificadorDepago CHECK() <-- ¿Solo aceptan 3 tipos de pago? Efectivo,tarjeta y ewallet
-	)
-END;
-GO
---		Tabla Detalle De Factura
-IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'DetalleFactura')
-BEGIN
-	CREATE TABLE Factura.DetalleFactura
-	(
-		idFactura INT,
-		idDetalleFactura INT IDENTITY(1,1),
-		idProducto INT,
-		cantidad SMALLINT NOT NULL,
-		CONSTRAINT PK_DetalleFactura PRIMARY KEY(idFactura,idDetalleFactura),
-		CONSTRAINT FK_DetalleFactura_Producto FOREIGN KEY(idProducto) REFERENCES Producto.Producto(idProducto),
-		CONSTRAINT FK_DetalleFactura_Factura FOREIGN KEY(idFactura) REFERENCES Factura.Factura(idFactura),
-		CONSTRAINT CK_DetalleFactura_Cantidad CHECK(cantidad > 0)
 	)
 END;
 GO
