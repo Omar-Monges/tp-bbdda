@@ -344,7 +344,6 @@ GO
 --		DROP PROCEDURE Producto.importarCatalogoCSV
 GO
 --EXEC Producto.importarCatalogoCSV 'C:\Users\joela\Downloads\TP_integrador_Archivos\TP_integrador_Archivos\Productos\catalogo.csv'
-GO
 CREATE OR ALTER PROCEDURE Producto.importarCatalogoCSV (@rutaArchivo NVARCHAR(MAX))
 AS BEGIN
 	DECLARE @i INT = 1,
@@ -539,10 +538,8 @@ AS BEGIN
 
 	DROP TABLE #aux;
 END;
+--EXEC Producto.importarProductosElectronicosXLSX 'C:\Users\joela\Downloads\TP_integrador_Archivos\TP_integrador_Archivos\Productos\Electronic_accessories.xlsx'
 GO
-EXEC Producto.importarProductosElectronicosXLSX 'C:\Users\joela\Downloads\TP_integrador_Archivos\TP_integrador_Archivos\Productos\Electronic_accessories.xlsx'
-GO
--------------------------------------------------
 CREATE OR ALTER PROCEDURE Producto.importarProductosImportadosXLSX (@rutaArch VARCHAR(MAX))
 AS BEGIN
 	
@@ -583,11 +580,11 @@ AS BEGIN
 	DROP TABLE #aux;
 END
 GO
-EXEC Producto.importarProductosImportadosXLSX 'C:\Users\joela\Downloads\TP_integrador_Archivos\TP_integrador_Archivos\Productos\Productos_importados.xlsx'
+--EXEC Producto.importarProductosImportadosXLSX 'C:\Users\joela\Downloads\TP_integrador_Archivos\TP_integrador_Archivos\Productos\Productos_importados.xlsx'
 GO
 -------------------------------------------------
---DROP PROCEDURE Factura.agregarFacturas
-CREATE OR ALTER PROCEDURE Factura.agregarFacturas (@rutaArch NVARCHAR(MAX))
+--		DROP PROCEDURE Factura.importarFacturas
+CREATE OR ALTER PROCEDURE Factura.importarFacturas (@rutaArch NVARCHAR(MAX))
 AS
 BEGIN
     DECLARE @SqlDinamico NVARCHAR(MAX);
@@ -617,7 +614,6 @@ BEGIN
             FIRSTROW = 2
         );';
     EXEC sp_executesql @SqlDinamico;
-	--drop table #aux;end;
 
     UPDATE #aux 
 		SET producto = REPLACE(producto, 'á', 'a');		
@@ -634,7 +630,6 @@ BEGIN
 	UPDATE #aux
 		SET idDePago = SUBSTRING(idDePago,2,LEN(idDePago))
 		WHERE CHARINDEX('-',idDePago,1) = 0;
-	--select * from 
 
 	UPDATE #aux
 		SET ciudad = 'San Justo'
@@ -646,7 +641,6 @@ BEGIN
 		SET ciudad = 'Lomas del Mirador'
 		WHERE ciudad LIKE 'Mandalay';
 
-	--select COUNT(id) from #aux;
 	WITH ProductosInexistentesCTE AS
 	(
 		SELECT * FROM #aux a 
@@ -656,7 +650,6 @@ BEGIN
 							)
 	)
 	DELETE FROM ProductosInexistentesCTE;
-	--SELECT * FROM Factura.Factura;
 
 	WITH FacturaCTE AS 
 	(
@@ -687,24 +680,16 @@ BEGIN
 	)
 	INSERT INTO Factura.Factura (tipoFactura,tipoCliente,genero,cantidad,fechaHora,idProducto,idMedioDepago,legajo,idSucursal,identificadorDePago)
 		SELECT * FROM FacturaAInsertarCTE
-	--SELECT *  FROM FacturaAInsertarCTE
---	(tipoFactura,tipoCliente,genero,cantidad,fechaHora,idProducto,idMedioDepago,legajo,idSucursal,identificadorDePago)
-
-	--		SELECT * FROM Factura.MedioDePago
-	/*
-	INSERT INTO Factura.Factura (tipoFactura,tipoCliente,genero,cantidad,fechaHora,idProducto,idMedioDepago,legajo,idSucursal,identificadorDePago)
-		SELECT  a.tipoFactura,a.tipoCliente,a.genero,a.cantidad,a.fecha,p.idProducto,a.idDePago
-			FROM #aux a JOIN Producto.Producto p
-				ON a.producto = p.descripcionProducto COLLATE Modern_SPanish_CI_AI;
-				*/
-	--select COUNT(id) from #aux;
-   -- SELECT * FROM #aux;
 
     DROP TABLE #aux;
 END;
 GO
-EXEC Factura.agregarFacturas 'C:\Users\joela\Downloads\TP_integrador_Archivos\TP_integrador_Archivos\Ventas_registradas.csv'
+--EXEC Factura.agregarFacturas 'C:\Users\joela\Downloads\TP_integrador_Archivos\TP_integrador_Archivos\Ventas_registradas.csv'
+EXEC Producto.importarCatalogoCSV 'C:\Users\joela\Downloads\TP_integrador_Archivos\TP_integrador_Archivos\Productos\catalogo.csv'
 GO
-SELECT COUNT(descripcionProducto),* FROM Producto.Producto 
-
-SELECT * FROM Factura.Factura
+EXEC Producto.importarProductosElectronicosXLSX 'C:\Users\joela\Downloads\TP_integrador_Archivos\TP_integrador_Archivos\Productos\Electronic_accessories.xlsx'
+GO
+EXEC Producto.importarProductosImportadosXLSX 'C:\Users\joela\Downloads\TP_integrador_Archivos\TP_integrador_Archivos\Productos\Productos_importados.xlsx'
+GO
+EXEC Factura.importarFacturas 'C:\Users\joela\Downloads\TP_integrador_Archivos\TP_integrador_Archivos\Ventas_registradas.csv'
+GO
