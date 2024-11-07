@@ -169,10 +169,8 @@ BEGIN
 		idFactura INT IDENTITY(1,1),
 		tipoFactura CHAR NOT NULL,
 		tipoCliente VARCHAR(10) NOT NULL,
-		genero VARCHAR(10) NOT NULL,--corregir
-		cantidad SMALLINT NOT NULL,
+		genero VARCHAR(10) NOT NULL,--corregir <-- sacar esta wea
 		fechaHora SMALLDATETIME NOT NULL,
-		idProducto INT,
 		idMedioDepago INT,
 		legajo INT,
 		idSucursal INT,
@@ -184,9 +182,24 @@ BEGIN
 		CONSTRAINT CK_Factura_TipoFactura CHECK(tipoFactura IN ('A', 'B', 'C')),
 		CONSTRAINT CK_Factura_TipoCliente CHECK(tipoCliente IN('Normal', 'Member')), 
 		CONSTRAINT CK_Factura_Genero CHECK(genero IN('Male', 'Female')),
-		CONSTRAINT FK_Factura_Producto FOREIGN KEY(idProducto) REFERENCES Producto.Producto(idProducto),
-		CONSTRAINT CK_Factura_CantidadProductos CHECK(cantidad > 0)
+		
 --		CONSTRAINT CK_Factura_IdentificadorDepago CHECK() <-- ¿Solo aceptan 3 tipos de pago? Efectivo,tarjeta y ewallet
 	)
 END;
 GO
+
+IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'DetalleFactura')
+BEGIN--Esto se agrega de nuevo
+	CREATE TABLE Factura.DetalleFactura
+	(
+		idFactura INT,
+		idDetalleFactura INT IDENTITY(1,1),
+		precioUnitario DECIMAL(10,2) NOT NULL,
+		idProducto INT,
+		cantidad SMALLINT NOT NULL,
+		CONSTRAINT FK_DetalleFactura_Factura FOREIGN KEY(idFactura) REFERENCES Factura.Factura(idFactura),
+		CONSTRAINT CK_Factura_CantidadProductos CHECK(cantidad > 0)		,
+		CONSTRAINT FK_Factura_Producto FOREIGN KEY(idProducto) REFERENCES Producto.Producto(idProducto),
+
+	)
+END

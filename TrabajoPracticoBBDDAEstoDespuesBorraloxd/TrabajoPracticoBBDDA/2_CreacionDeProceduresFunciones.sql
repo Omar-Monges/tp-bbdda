@@ -886,7 +886,7 @@ END;
 GO
 ------------------------------------------------Factura------------------------------------------------
 --		DROP PROCEDURE Factura.agregarFactura
-CREATE OR ALTER PROCEDURE Factura.agregarFactura(@tipoFactura CHAR, @tipoCliente VARCHAR(10), @genero VARCHAR(10),
+/*CREATE OR ALTER PROCEDURE Factura.agregarFactura(@tipoFactura CHAR, @tipoCliente VARCHAR(10), @genero VARCHAR(10),
 												@fechaHora SMALLDATETIME, @idMedioDePago INT, @legajo INT,
 												@idSucursal INT, @idDePago INT,@idProducto INT,@cantidad SMALLINT)
 AS BEGIN
@@ -900,7 +900,7 @@ AS BEGIN
 		VALUES (@tipoFactura,@tipoCLiente,@genero,@fechaHora,@idMedioDePago,@legajo,@idSucursal,@idDePago,@idProducto,@cantidad);
 
 END
-GO
+GO*/
 -------------------------------------------------------------------------------------------------------------------
 /*
 Mensual: ingresando un mes y año determinado mostrar el total facturado por días de
@@ -908,7 +908,7 @@ la semana, incluyendo sábado y domingo.
 */
 --		DROP PROCEDURE Factura.exportarResumenMensual
 --		EXEC Factura.exportarResumenMensual 3,2019
-CREATE OR ALTER PROCEDURE Factura.exportarResumenMensual (@mes TINYINT, @anio SMALLINT)
+/*CREATE OR ALTER PROCEDURE Factura.exportarResumenMensual (@mes TINYINT, @anio SMALLINT)
 AS BEGIN
 	WITH VentasXDiaCTE AS
 	(
@@ -978,7 +978,7 @@ AS BEGIN
 		FOR XML RAW('VentaMensualXTurno'),ROOT('Trimestre'),ELEMENTS
 
 END
-GO
+GO*/
 /*
 Por rango de fechas: ingresando un rango de fechas a demanda, debe poder mostrar
 la cantidad de productos vendidos en ese rango por sucursal, ordenado de mayor a
@@ -986,7 +986,7 @@ menor.
 */
 --		Factura.exportarResumenRangoFechas
 --		EXEC Factura.exportarResumenRangoFechas @fecha1='2019-1-15',@fecha2='2019-2-24'
-CREATE OR ALTER PROCEDURE Factura.exportarResumenRangoFechas (@fecha1 DATE,@fecha2 DATE)
+/*CREATE OR ALTER PROCEDURE Factura.exportarResumenRangoFechas (@fecha1 DATE,@fecha2 DATE)
 AS BEGIN
 	DECLARE @fechaAux DATE;
 
@@ -1058,13 +1058,13 @@ AS BEGIN
 	)
 	SELECT TOP(5) * FROM MontoTotalXProducto ORDER BY Monto ASC
 END
-GO
+GO*/
 /*
 Mostrar total acumulado de ventas (o sea tambien mostrar el detalle) para una fecha
 y sucursal particulares
 	SELECT * FROM Factura.Factura;
 	SELECT * FROM Factura.verFacturaDetallada;
-*/
+
 --		EXEC Factura.exportarResumenRangoFechas @fecha1='2019-1-15',@fecha2='2019-2-24'
 --		DROP PROCEDURE Factura.mostrarFacturaDetalladaXSucursalFecha
 --		EXEC Factura.mostrarFacturaDetalladaXSucursalFecha @fecha='2019-1-15',@idSucursal=1;
@@ -1150,4 +1150,4 @@ CREATE OR ALTER VIEW Factura.verFacturaDetallada AS
 				ON t.idFactura = f.idFactura
 	)
 	SELECT * FROM FacturaDetallada
-GO
+GO*/
